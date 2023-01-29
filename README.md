@@ -1,15 +1,21 @@
 # Camera Youtube Scheduler
-Provides the ability to schdule youtube live streams for IP camera.
+
+Provides the ability to schedule youtube live streams for IP camera.
 
 ## Assumptions
+
 Each camera has it's own youtube account.
 
 # Installation
-```pip3 install -r requirements.txt```
+
+`pip3 install -r requirements.txt`
 
 # Requirements
+
 ## Settings
-A settings file, settings.json is required in the format of:
+
+A settings file, settings.json saved in the root of the project, is required in the format of:
+
 ```
 {
     "cameras": [
@@ -22,3 +28,7 @@ A settings file, settings.json is required in the format of:
     ]
 }
 ```
+
+## Client Secret
+
+A client_secret.json file is required and saved in the root of the project.
