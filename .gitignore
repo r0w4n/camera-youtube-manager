@@ -131,3 +131,4 @@ settings.json
 source/.DS_Store
 client_secret.json
 tokens/*
+.DS_Store

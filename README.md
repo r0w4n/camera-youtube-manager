@@ -12,6 +12,8 @@ Each camera has it's own youtube account.
 
 # Requirements
 
+Requires the creation of a [Google Cloud Project](https://console.cloud.google.com/).
+
 ## Settings
 
 A settings file, settings.json saved in the root of the project, is required in the format of:
@@ -31,4 +33,4 @@ A settings file, settings.json saved in the root of the project, is required in 
 
 ## Client Secret
 
-A client_secret.json file is required and saved in the root of the project.
+A client_secret.json file is required and saved in the root of the project. This is obtained from [Google Cloud Project Credentials](https://console.cloud.google.com/apis/credentials)
