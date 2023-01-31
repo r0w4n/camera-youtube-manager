@@ -12,7 +12,9 @@ Each camera has it's own youtube account.
 
 # Requirements
 
-Requires the creation of a [Google Cloud Project](https://console.cloud.google.com/).
+* Requires the creation of a [Google Cloud Project](https://console.cloud.google.com/).
+* Runs on Linux like environment
+* [Screen](https://www.gnu.org/software/screen/) is installed
 
 ## Settings
 
