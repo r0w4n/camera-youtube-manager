@@ -51,8 +51,6 @@ def has_scheduled_broadcast(youtube):
 
 
 def do_schedule(youtube, camera):
-    print("no scheduled broadcasts found for " + camera["name"])
-
     # Schedules a broadcast
     broadcast_id = schedule_broadcast(youtube, camera["title"], camera["description"])
 

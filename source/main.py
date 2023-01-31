@@ -7,6 +7,7 @@ from googleapiclient.errors import HttpError
 import time
 import datetime
 
+
 def main():
     try:
         camera_settings = settings.get_settings()
@@ -24,6 +25,9 @@ def main():
             # Checks to see whether there are any scheduled broadcasts and if there isn't creates a schedule
             if not youtube_schedule.has_scheduled_broadcast(youtube):
                 print(f"""{camera["name"]} has no scheduled stream on youtube""")
+                if youtube_streamer.is_streaming(camera):
+                    print(f"""killing screen session for {camera["name"]}""")
+                    youtube_streamer.kill_stream(camera)
                 print(f"""creating schedule for {camera["name"]} on youtube""")
                 youtube_schedule.do_schedule(youtube, camera)
 
