@@ -33,4 +33,4 @@ A settings file, settings.json saved in the root of the project, is required in 
 
 ## Client Secret
 
-A client_secret.json file is required and saved in the root of the project. This is obtained from [Google Cloud Project Credentials](https://console.cloud.google.com/apis/credentials)
+A client_secret.json file is required and saved in the root of the project. This is a oauth clienti id and is obtained from [Google Cloud Project Credentials](https://console.cloud.google.com/apis/credentials)
