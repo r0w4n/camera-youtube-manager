@@ -41,6 +41,7 @@ def main():
                 print(f"""starting stream for {camera["name"]}""")
                 youtube_streamer.start_stream(camera)
             
+            # checks to see whether a scheduled broadcast is inactive
             if youtube_schedule.has_inactive_broadcast(youtube):
                 print(f"""{camera["name"]} has a scheduled broadcast that hasn't been started""")
                 if youtube_streamer.is_streaming(camera):
