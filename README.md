@@ -12,6 +12,7 @@ Provides the ability to schedule youtube live streams and manage the streams for
 * [Screen](https://www.gnu.org/software/screen/) is installed
 * [FFmpeg](https://ffmpeg.org/)
 * Each camera has it's own youtube account.
+* [client_secret.json](https://console.cloud.google.com/apis/credentials)
 
 # Installation
 
@@ -35,7 +36,3 @@ A settings file, settings.json saved in the root of the project, is required in 
     ]
 }
 ```
-
-## Client Secret
-
-A client_secret.json file is required and saved in the root of the project. This is a oauth clienti id and is obtained from [Google Cloud Project Credentials](https://console.cloud.google.com/apis/credentials)
