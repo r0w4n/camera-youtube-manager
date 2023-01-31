@@ -23,7 +23,7 @@ def main():
             )
 
             # Check to see if it midnight and if it is kill the current schedule
-            now = datetime.datetime.now().replace(hour=0, minute=0, second=0)
+            now = datetime.datetime.now()
             if now.hour == 0 and now.minute == 0 and youtube_schedule.has_scheduled_broadcast(youtube):
                 manage_ending_broadcast(camera, youtube)
 
