@@ -12,7 +12,7 @@ Provides the ability to schedule youtube live streams and manage the streams for
 * [Screen](https://www.gnu.org/software/screen/) is installed
 * [FFmpeg](https://ffmpeg.org/)
 * Each camera has it's own youtube account.
-* [client_secret.json](https://console.cloud.google.com/apis/credentials)
+* [client_secret.json](https://console.cloud.google.com/apis/credentials) placed in the root of the project
 
 # Installation
 
