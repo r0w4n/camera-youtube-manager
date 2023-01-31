@@ -27,7 +27,7 @@ def is_live_stream_healthy(youtube):
 
 def is_streaming(camera):
     try:
-        subprocess.check_output([f'screen -list | grep -q "{camera}" ;'], shell=True)
+        subprocess.check_output([f'screen -list | grep -q "{camera["name"]}" ;'], shell=True)
         return True
     except subprocess.CalledProcessError:
         return False
