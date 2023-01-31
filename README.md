@@ -1,6 +1,6 @@
-# Camera Youtube Scheduler
+# Camera Youtube Manager
 
-Provides the ability to schedule youtube live streams for IP camera.
+Provides the ability to schedule youtube live streams and manage the streams for IP camera.
 
 ## Assumptions
 
@@ -25,7 +25,9 @@ A settings file, settings.json saved in the root of the project, is required in 
             "name": "cam1",
             "title": "title used to name the youtube live stream",
             "description": "description of the youtube live stream",
-            "enabled": true
+            "enabled": true,
+            "url": "user:password@192.168.1.1/ISAPI/Streaming/Channels/101/picture",
+            "key": "sdfs-sdfd-sdfs-sdfs-sdfd"
         }
     ]
 }
