@@ -2,19 +2,18 @@
 
 Provides the ability to schedule youtube live streams and manage the streams for IP camera.
 
-## Assumptions
-
-Each camera has it's own youtube account.
-
-# Installation
-
-`pip3 install -r requirements.txt`
-
 # Requirements
 
 * Requires the creation of a [Google Cloud Project](https://console.cloud.google.com/).
 * Runs on Linux like environment
 * [Screen](https://www.gnu.org/software/screen/) is installed
+* Each camera has it's own youtube account.
+
+# Installation
+
+`pip3 install -r requirements.txt`
+
+
 
 ## Settings
 
