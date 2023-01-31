@@ -7,7 +7,6 @@ def schedule_broadcast(youtube, title, description):
             "title": title,
             "description": description,
             "scheduledStartTime": datetime.datetime.now().isoformat() + "Z",
-            "scheduledEndTime": datetime.datetime.now().replace(hour=23, minute=59, second=59).isoformat() + "Z"
         },
         "status": {
             "privacyStatus": "public",
@@ -49,6 +48,7 @@ def has_scheduled_broadcast(youtube):
 
     return False
 
+
 def has_inactive_broadcast(youtube):
     response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
 
@@ -56,6 +56,15 @@ def has_inactive_broadcast(youtube):
         return True
 
     return False
+
+
+def get_scheduled_broadcast_id(youtube):
+    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
+    live_stream = [
+        x for x in response["items"] if x["status"]["lifeCycleStatus"] != "complete"
+    ]
+    return live_stream[0]["id"]
+
 
 def do_schedule(youtube, camera):
     # Schedules a broadcast
@@ -66,4 +75,10 @@ def do_schedule(youtube, camera):
         part="id,contentDetails",
         id=broadcast_id,
         streamId=get_default_stream_id(youtube),
+    ).execute()
+
+
+def end_schedule(youtube):
+    youtube.liveBroadcasts().transition(
+        broadcastStatus="complete", id=get_scheduled_broadcast_id(youtube), part="id,snippet,status"
     ).execute()
