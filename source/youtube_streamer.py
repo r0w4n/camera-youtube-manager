@@ -14,12 +14,7 @@ def start_stream(camera):
 
 def is_live_stream_healthy(youtube):
     response = youtube.liveStreams().list(part="status", mine=True).execute()
-
-    if [
-        x
-        for x in response["items"]
-        if x["status"]["healthStatus"]["status"] != "noData"
-    ]:
+    if [x for x in response["items"] if x["status"]["healthStatus"]["status"] != "noData"]:
         return True
 
     return False
@@ -27,7 +22,9 @@ def is_live_stream_healthy(youtube):
 
 def is_streaming(camera):
     try:
-        subprocess.check_output([f'screen -list | grep -q "{camera["name"]}" ;'], shell=True)
+        subprocess.check_output(
+            [f'screen -list | grep -q "{camera["name"]}" ;'], shell=True
+        )
         return True
     except subprocess.CalledProcessError:
         return False

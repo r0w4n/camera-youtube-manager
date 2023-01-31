@@ -49,6 +49,13 @@ def has_scheduled_broadcast(youtube):
 
     return False
 
+def has_inactive_broadcast(youtube):
+    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
+
+    if [x for x in response["items"] if x["status"]["lifeCycleStatus"] == "ready"]:
+        return True
+
+    return False
 
 def do_schedule(youtube, camera):
     # Schedules a broadcast

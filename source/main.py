@@ -31,6 +31,7 @@ def main():
                 print(f"""creating schedule for {camera["name"]} on youtube""")
                 youtube_schedule.do_schedule(youtube, camera)
 
+            # checks to see whether there are any unhealthy streams and if there are kill them
             if not youtube_streamer.is_live_stream_healthy(youtube):
                 print(f"""{camera["name"]} stream on youtube is unhealthy""")
                 if youtube_streamer.is_streaming(camera):
@@ -39,6 +40,16 @@ def main():
                     time.sleep(5)
                 print(f"""starting stream for {camera["name"]}""")
                 youtube_streamer.start_stream(camera)
+            
+            if youtube_schedule.has_inactive_broadcast(youtube):
+                print(f"""{camera["name"]} has a scheduled broadcast that hasn't been started""")
+                if youtube_streamer.is_streaming(camera):
+                    print(f"""killing screen session for {camera["name"]}""")
+                    youtube_streamer.kill_stream(camera)
+                    time.sleep(5)
+                print(f"""starting stream for {camera["name"]}""")
+                youtube_streamer.start_stream(camera)
+
     except HttpError as err:
         print(err)
 
