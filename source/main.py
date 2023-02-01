@@ -46,6 +46,10 @@ def manage_ending_broadcast(camera, youtube):
     print(f"""It's midnight and {camera["name"]} has scheduled stream on youtube""")
     print(f"""Ending {camera["name"]} scheduled stream on youtube""")
     youtube_schedule.end_schedule(youtube)
+    if youtube_streamer.is_streaming(camera):
+        print(f"""killing screen session for {camera["name"]}""")
+        youtube_streamer.kill_stream(camera)
+        time.sleep(5)
 
 def manage_schedule(camera, youtube):
     print(f"""{camera["name"]} has no scheduled stream on youtube""")
