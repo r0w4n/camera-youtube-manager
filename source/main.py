@@ -38,7 +38,10 @@ def main():
 
             # Build the YouTube service object and builds the credential object
             youtube = build(
-                "youtube", "v3", credentials=youtube_auth.handle_auth(camera["name"])
+                "youtube",
+                "v3",
+                credentials=youtube_auth.handle_auth(camera["name"]),
+                cache_discovery=False,
             )
 
             # Check to see if it time to recycle and if it is kill the current schedule
