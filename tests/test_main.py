@@ -132,3 +132,19 @@ def test_main_checks_inactive_broadcast_when_stream_is_healthy(main_module):
     main.manage_schedule.assert_not_called()
     main.manage_unhealthy_stream.assert_not_called()
     main.manage_inactive_broadcast.assert_called_once_with(camera)
+
+
+def test_manage_schedule_creates_broadcast_and_starts_stream(main_module):
+    """Verify that schedule creation also starts the local stream immediately."""
+    main = main_module["main"]
+    youtube = object()
+    camera = {"name": "cam1", "enabled": True}
+
+    main_module["youtube_streamer"].is_streaming = Mock(return_value=False)
+    main_module["youtube_streamer"].start_stream = Mock()
+    main_module["youtube_schedule"].do_schedule = Mock()
+
+    main.manage_schedule(camera, youtube)
+
+    main_module["youtube_schedule"].do_schedule.assert_called_once_with(youtube, camera)
+    main_module["youtube_streamer"].start_stream.assert_called_once_with(camera)

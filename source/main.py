@@ -95,8 +95,11 @@ def manage_schedule(camera, youtube):
     if youtube_streamer.is_streaming(camera):
         logger.info("%s - killing existing screen session", camera["name"])
         youtube_streamer.kill_stream(camera)
+        time.sleep(5)
     logger.info("%s - creating scheduled broadcast", camera["name"])
     youtube_schedule.do_schedule(youtube, camera)
+    logger.info("%s - starting stream", camera["name"])
+    youtube_streamer.start_stream(camera)
 
 
 def manage_unhealthy_stream(camera):
