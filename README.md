@@ -18,6 +18,10 @@ Provides the ability to schedule youtube live streams and manage the streams for
 
 `pip3 install -r requirements.txt`
 
+# Testing
+
+`pytest -q`
+
 ## Settings
 
 A settings file, settings.json saved in the root of the project, is required in the format of:
