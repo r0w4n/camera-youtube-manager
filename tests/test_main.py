@@ -182,3 +182,18 @@ def test_main_continues_to_next_camera_after_http_error(main_module):
         youtube2
     )
     main.logger.exception.assert_called_once()
+
+
+def test_manage_inactive_broadcast_leaves_running_stream_alone(main_module):
+    """Verify that a running local stream is not killed when YouTube still says ready."""
+    main = main_module["main"]
+    camera = {"name": "cam1", "enabled": True}
+
+    main_module["youtube_streamer"].is_streaming = Mock(return_value=True)
+    main_module["youtube_streamer"].kill_stream = Mock()
+    main_module["youtube_streamer"].start_stream = Mock()
+
+    main.manage_inactive_broadcast(camera)
+
+    main_module["youtube_streamer"].kill_stream.assert_not_called()
+    main_module["youtube_streamer"].start_stream.assert_not_called()

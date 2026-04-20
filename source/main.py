@@ -115,9 +115,11 @@ def manage_unhealthy_stream(camera):
 def manage_inactive_broadcast(camera):
     logger.warning("%s - scheduled broadcast has not started", camera["name"])
     if youtube_streamer.is_streaming(camera):
-        logger.info("%s - killing screen session", camera["name"])
-        youtube_streamer.kill_stream(camera)
-        time.sleep(5)
+        logger.info(
+            "%s - local stream is already running; waiting for YouTube broadcast to activate",
+            camera["name"],
+        )
+        return
     logger.info("%s - starting stream", camera["name"])
     youtube_streamer.start_stream(camera)
 
