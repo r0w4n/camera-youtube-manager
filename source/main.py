@@ -25,17 +25,17 @@ def configure_logging():
 def main():
     configure_logging()
 
-    try:
-        camera_settings = settings.get_settings()
-        logger.info("Loaded %s camera configuration(s)", len(camera_settings["cameras"]))
+    camera_settings = settings.get_settings()
+    logger.info("Loaded %s camera configuration(s)", len(camera_settings["cameras"]))
 
-        for camera in camera_settings["cameras"]:
-            if not camera["enabled"]:
-                logger.info("%s - camera disabled; skipping", camera["name"])
-                continue
+    for camera in camera_settings["cameras"]:
+        if not camera["enabled"]:
+            logger.info("%s - camera disabled; skipping", camera["name"])
+            continue
 
-            logger.info("%s - checking camera", camera["name"])
+        logger.info("%s - checking camera", camera["name"])
 
+        try:
             # Build the YouTube service object and builds the credential object
             youtube = build(
                 "youtube",
@@ -65,8 +65,8 @@ def main():
 
             logger.info("%s - healthy; no action needed", camera["name"])
 
-    except HttpError as err:
-        logger.exception("YouTube API request failed: %s", err)
+        except HttpError as err:
+            logger.exception("%s - YouTube API request failed: %s", camera["name"], err)
 
 
 def is_recycle_time():
