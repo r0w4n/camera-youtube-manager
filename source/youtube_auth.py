@@ -28,10 +28,10 @@ def handle_auth(camera_name):
     # If there are no (valid) credentials available, let the user log in.
     if not credentials or not credentials.valid:
         if credentials and credentials.expired and credentials.refresh_token:
-            logger.info("Refreshing YouTube credentials for %s", camera_name)
+            logger.info("%s - refreshing YouTube credentials", camera_name)
             credentials.refresh(Request())
         else:
-            logger.info("Requesting new YouTube credentials for %s", camera_name)
+            logger.info("%s - requesting new YouTube credentials", camera_name)
             flow = InstalledAppFlow.from_client_secrets_file(
                 os.path.dirname(os.path.abspath(__file__)) + "/../client_secret.json",
                 SCOPES,
@@ -40,6 +40,6 @@ def handle_auth(camera_name):
         # Save the credentials for the next run
         with open(token_file_path, "w") as token:
             token.write(credentials.to_json())
-        logger.info("Saved YouTube credentials for %s", camera_name)
+        logger.info("%s - saved YouTube credentials", camera_name)
 
     return credentials

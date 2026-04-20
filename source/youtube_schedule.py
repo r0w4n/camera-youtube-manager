@@ -5,12 +5,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def schedule_broadcast(youtube, title, description):
-    logger.info("Creating YouTube broadcast with title %s", title)
+def schedule_broadcast(youtube, camera):
+    logger.info(
+        '%s - creating YouTube broadcast with title "%s"',
+        camera["name"],
+        camera["title"],
+    )
     content = {
         "snippet": {
-            "title": title,
-            "description": description,
+            "title": camera["title"],
+            "description": camera["description"],
             "scheduledStartTime": datetime.datetime.now().isoformat() + "Z",
         },
         "status": {
@@ -37,7 +41,7 @@ def schedule_broadcast(youtube, title, description):
         .execute()
     )
 
-    logger.info("Created YouTube broadcast %s", response["id"])
+    logger.info("%s - created YouTube broadcast %s", camera["name"], response["id"])
     return response["id"]
 
 
@@ -74,8 +78,8 @@ def get_scheduled_broadcast_id(youtube):
 
 def do_schedule(youtube, camera):
     # Schedules a broadcast
-    broadcast_id = schedule_broadcast(youtube, camera["title"], camera["description"])
-    logger.info("Binding broadcast %s for camera %s", broadcast_id, camera["name"])
+    broadcast_id = schedule_broadcast(youtube, camera)
+    logger.info("%s - binding broadcast %s to stream", camera["name"], broadcast_id)
 
     # Binds the new broadcast to default stream (this assumes that only one stream per account)
     youtube.liveBroadcasts().bind(
@@ -85,9 +89,9 @@ def do_schedule(youtube, camera):
     ).execute()
 
 
-def end_schedule(youtube):
+def end_schedule(youtube, camera):
     broadcast_id = get_scheduled_broadcast_id(youtube)
-    logger.info("Ending YouTube broadcast %s", broadcast_id)
+    logger.info("%s - ending YouTube broadcast %s", camera["name"], broadcast_id)
     youtube.liveBroadcasts().transition(
         broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
     ).execute()
