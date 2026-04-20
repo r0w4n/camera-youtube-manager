@@ -63,6 +63,8 @@ def main():
                 manage_inactive_broadcast(camera)
                 continue
 
+            logger.info("%s is healthy; no action needed", camera["name"])
+
     except HttpError as err:
         logger.exception("YouTube API request failed: %s", err)
 
