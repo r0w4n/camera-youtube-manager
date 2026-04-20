@@ -1,16 +1,24 @@
-import os
-import subprocess
 import logging
+import re
+import subprocess
 
 
 HEALTHY_STREAM_STATUSES = {"good", "ok"}
 logger = logging.getLogger(__name__)
 
 
+def get_screen_name(camera):
+    return f"youtube_{camera['name']}"
+
+
 def kill_stream(camera):
-    screen_name = f"""youtube_{camera["name"]}"""
+    screen_name = get_screen_name(camera)
     logger.info("%s - stopping screen session %s", camera["name"], screen_name)
-    exit_status = os.system(f"""screen -X -S {screen_name} quit""")
+    result = subprocess.run(
+        ["screen", "-X", "-S", screen_name, "quit"],
+        check=False,
+    )
+    exit_status = result.returncode
     if exit_status != 0:
         logger.warning(
             "%s - screen quit command for %s exited with status %s",
@@ -21,10 +29,36 @@ def kill_stream(camera):
 
 
 def start_stream(camera):
+    screen_name = get_screen_name(camera)
     logger.info("%s - starting ffmpeg stream", camera["name"])
-    exit_status = os.system(
-        f"""screen -dS youtube_{camera["name"]}  -m ffmpeg -f lavfi -i anullsrc -rtsp_transport tcp -i rtsp://{camera["url"]} -vcodec libx264 -pix_fmt + -c:v copy -f flv rtmp://a.rtmp.youtube.com/live2/{camera["key"]}"""
+    result = subprocess.run(
+        [
+            "screen",
+            "-dS",
+            screen_name,
+            "-m",
+            "ffmpeg",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            f"rtsp://{camera['url']}",
+            "-vcodec",
+            "libx264",
+            "-pix_fmt",
+            "+",
+            "-c:v",
+            "copy",
+            "-f",
+            "flv",
+            f"rtmp://a.rtmp.youtube.com/live2/{camera['key']}",
+        ],
+        check=False,
     )
+    exit_status = result.returncode
     if exit_status != 0:
         logger.warning(
             "%s - ffmpeg launch command exited with status %s",
@@ -52,10 +86,12 @@ def is_live_stream_healthy(camera, youtube):
 
 
 def is_streaming(camera):
-    try:
-        subprocess.check_output(
-            [f'screen -list | grep -q "{camera["name"]}" ;'], shell=True
-        )
-        return True
-    except subprocess.CalledProcessError:
-        return False
+    screen_name = get_screen_name(camera)
+    result = subprocess.run(
+        ["screen", "-list"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    pattern = rf"\d+\.{re.escape(screen_name)}(?:\t|\s)"
+    return re.search(pattern, result.stdout or "") is not None
