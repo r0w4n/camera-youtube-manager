@@ -1,7 +1,12 @@
 import datetime
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def schedule_broadcast(youtube, title, description):
+    logger.info("Creating YouTube broadcast with title %s", title)
     content = {
         "snippet": {
             "title": title,
@@ -32,6 +37,7 @@ def schedule_broadcast(youtube, title, description):
         .execute()
     )
 
+    logger.info("Created YouTube broadcast %s", response["id"])
     return response["id"]
 
 
@@ -69,6 +75,7 @@ def get_scheduled_broadcast_id(youtube):
 def do_schedule(youtube, camera):
     # Schedules a broadcast
     broadcast_id = schedule_broadcast(youtube, camera["title"], camera["description"])
+    logger.info("Binding broadcast %s for camera %s", broadcast_id, camera["name"])
 
     # Binds the new broadcast to default stream (this assumes that only one stream per account)
     youtube.liveBroadcasts().bind(
@@ -79,6 +86,8 @@ def do_schedule(youtube, camera):
 
 
 def end_schedule(youtube):
+    broadcast_id = get_scheduled_broadcast_id(youtube)
+    logger.info("Ending YouTube broadcast %s", broadcast_id)
     youtube.liveBroadcasts().transition(
-        broadcastStatus="complete", id=get_scheduled_broadcast_id(youtube), part="id,snippet,status"
+        broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
     ).execute()

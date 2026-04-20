@@ -22,6 +22,14 @@ Provides the ability to schedule youtube live streams and manage the streams for
 
 `pytest -q`
 
+# Logging
+
+The application logs the main stream lifecycle actions at `INFO` level by default.
+
+To change the verbosity, set `LOG_LEVEL`, for example:
+
+`LOG_LEVEL=WARNING python3 source/main.py`
+
 ## Settings
 
 A settings file, settings.json saved in the root of the project, is required in the format of:
