@@ -29,14 +29,17 @@ def main():
             # Checks to see whether there are any scheduled broadcasts and if there isn't creates a schedule
             if not youtube_schedule.has_scheduled_broadcast(youtube):
                 manage_schedule(camera, youtube)
+                continue
 
             # checks to see whether there are any unhealthy streams and if there are kill them
             if not youtube_streamer.is_live_stream_healthy(youtube):
                 manage_unhealthy_stream(camera)
+                continue
 
             # checks to see whether a scheduled broadcast is inactive
             if youtube_schedule.has_inactive_broadcast(youtube):
                 manage_inactive_broadcast(camera)
+                continue
 
     except HttpError as err:
         print(err)
