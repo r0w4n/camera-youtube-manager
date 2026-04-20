@@ -5,6 +5,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_scheduled_start_time():
+    return (
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
 def schedule_broadcast(youtube, camera):
     logger.info(
         '%s - creating YouTube broadcast with title "%s"',
@@ -15,7 +24,7 @@ def schedule_broadcast(youtube, camera):
         "snippet": {
             "title": camera["title"],
             "description": camera["description"],
-            "scheduledStartTime": datetime.datetime.now().isoformat() + "Z",
+            "scheduledStartTime": get_scheduled_start_time(),
         },
         "status": {
             "privacyStatus": "public",
