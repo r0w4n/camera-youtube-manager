@@ -2,6 +2,9 @@ import os
 import subprocess
 
 
+HEALTHY_STREAM_STATUSES = {"good", "ok"}
+
+
 def kill_stream(camera):
     os.system(f"""screen -X -S youtube_{camera["name"]} quit""")
 
@@ -14,10 +17,11 @@ def start_stream(camera):
 
 def is_live_stream_healthy(youtube):
     response = youtube.liveStreams().list(part="status", mine=True).execute()
-    if [x for x in response["items"] if x["status"]["healthStatus"]["status"] != "noData"]:
-        return True
-
-    return False
+    return any(
+        item.get("status", {}).get("healthStatus", {}).get("status")
+        in HEALTHY_STREAM_STATUSES
+        for item in response.get("items", [])
+    )
 
 
 def is_streaming(camera):
