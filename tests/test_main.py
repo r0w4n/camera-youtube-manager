@@ -8,6 +8,13 @@ import pytest
 
 
 SOURCE_DIR = Path(__file__).resolve().parents[1] / "source"
+sys.path.insert(0, str(SOURCE_DIR))
+
+from camera_config import AppSettings, CameraConfig
+
+
+def make_camera(name="cam1", enabled=True):
+    return CameraConfig(name=name, enabled=enabled)
 
 
 @pytest.fixture
@@ -61,9 +68,9 @@ def test_main_skips_later_checks_after_creating_schedule(main_module):
     """Verify that creating a schedule exits the loop before later checks run."""
     main = main_module["main"]
     youtube = object()
-    camera = {"name": "cam1", "enabled": True}
+    camera = make_camera()
 
-    main_module["settings"].get_settings = Mock(return_value={"cameras": [camera]})
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
     main_module["youtube_auth"].handle_auth = Mock(return_value="credentials")
     main.build = Mock(return_value=youtube)
     main.is_recycle_time = Mock(return_value=False)
@@ -88,9 +95,9 @@ def test_main_skips_inactive_check_after_restarting_unhealthy_stream(main_module
     """Verify that an unhealthy stream restart skips the inactive broadcast check."""
     main = main_module["main"]
     youtube = object()
-    camera = {"name": "cam1", "enabled": True}
+    camera = make_camera()
 
-    main_module["settings"].get_settings = Mock(return_value={"cameras": [camera]})
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
     main_module["youtube_auth"].handle_auth = Mock(return_value="credentials")
     main.build = Mock(return_value=youtube)
     main.is_recycle_time = Mock(return_value=False)
@@ -113,9 +120,9 @@ def test_main_checks_inactive_broadcast_when_stream_is_healthy(main_module):
     """Verify that healthy streams still reach the inactive broadcast branch."""
     main = main_module["main"]
     youtube = object()
-    camera = {"name": "cam1", "enabled": True}
+    camera = make_camera()
 
-    main_module["settings"].get_settings = Mock(return_value={"cameras": [camera]})
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
     main_module["youtube_auth"].handle_auth = Mock(return_value="credentials")
     main.build = Mock(return_value=youtube)
     main.is_recycle_time = Mock(return_value=False)
@@ -138,7 +145,7 @@ def test_manage_schedule_creates_broadcast_and_starts_stream(main_module):
     """Verify that schedule creation also starts the local stream immediately."""
     main = main_module["main"]
     youtube = object()
-    camera = {"name": "cam1", "enabled": True}
+    camera = make_camera()
 
     main_module["youtube_streamer"].is_streaming = Mock(return_value=False)
     main_module["youtube_streamer"].start_stream = Mock()
@@ -153,12 +160,12 @@ def test_manage_schedule_creates_broadcast_and_starts_stream(main_module):
 def test_main_continues_to_next_camera_after_http_error(main_module):
     """Verify that one camera's YouTube API failure does not stop later cameras."""
     main = main_module["main"]
-    camera1 = {"name": "cam1", "enabled": True}
-    camera2 = {"name": "cam2", "enabled": True}
+    camera1 = make_camera(name="cam1")
+    camera2 = make_camera(name="cam2")
     youtube2 = object()
 
     main_module["settings"].get_settings = Mock(
-        return_value={"cameras": [camera1, camera2]}
+        return_value=AppSettings(cameras=[camera1, camera2])
     )
     main_module["youtube_auth"].handle_auth = Mock(side_effect=["cred1", "cred2"])
     main.build = Mock(side_effect=[main.HttpError("boom"), youtube2])
@@ -187,7 +194,7 @@ def test_main_continues_to_next_camera_after_http_error(main_module):
 def test_manage_inactive_broadcast_leaves_running_stream_alone(main_module):
     """Verify that a running local stream is not killed when YouTube still says ready."""
     main = main_module["main"]
-    camera = {"name": "cam1", "enabled": True}
+    camera = make_camera()
 
     main_module["youtube_streamer"].is_streaming = Mock(return_value=True)
     main_module["youtube_streamer"].kill_stream = Mock()

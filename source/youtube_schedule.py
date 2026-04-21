@@ -1,6 +1,8 @@
 import datetime
 import logging
 
+from camera_config import CameraConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -14,16 +16,16 @@ def get_scheduled_start_time():
     )
 
 
-def schedule_broadcast(youtube, camera):
+def schedule_broadcast(youtube, camera: CameraConfig):
     logger.info(
         '%s - creating YouTube broadcast with title "%s"',
-        camera["name"],
-        camera["title"],
+        camera.name,
+        camera.title,
     )
     content = {
         "snippet": {
-            "title": camera["title"],
-            "description": camera["description"],
+            "title": camera.title,
+            "description": camera.description,
             "scheduledStartTime": get_scheduled_start_time(),
         },
         "status": {
@@ -50,7 +52,7 @@ def schedule_broadcast(youtube, camera):
         .execute()
     )
 
-    logger.info("%s - created YouTube broadcast %s", camera["name"], response["id"])
+    logger.info("%s - created YouTube broadcast %s", camera.name, response["id"])
     return response["id"]
 
 
@@ -59,36 +61,36 @@ def get_default_stream_id(youtube):
     return streams["items"][0]["id"]
 
 
-def has_scheduled_broadcast(youtube):
+def get_broadcasts(youtube):
     response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
+    return response["items"]
 
-    if [x for x in response["items"] if x["status"]["lifeCycleStatus"] != "complete"]:
-        return True
 
-    return False
+def has_scheduled_broadcast(youtube):
+    return any(
+        broadcast["status"]["lifeCycleStatus"] != "complete"
+        for broadcast in get_broadcasts(youtube)
+    )
 
 
 def has_inactive_broadcast(youtube):
-    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
-
-    if [x for x in response["items"] if x["status"]["lifeCycleStatus"] == "ready"]:
-        return True
-
-    return False
+    return any(
+        broadcast["status"]["lifeCycleStatus"] == "ready"
+        for broadcast in get_broadcasts(youtube)
+    )
 
 
 def get_scheduled_broadcast_id(youtube):
-    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
     live_stream = [
-        x for x in response["items"] if x["status"]["lifeCycleStatus"] != "complete"
+        x for x in get_broadcasts(youtube) if x["status"]["lifeCycleStatus"] != "complete"
     ]
     return live_stream[0]["id"]
 
 
-def do_schedule(youtube, camera):
+def do_schedule(youtube, camera: CameraConfig):
     # Schedules a broadcast
     broadcast_id = schedule_broadcast(youtube, camera)
-    logger.info("%s - binding broadcast %s to stream", camera["name"], broadcast_id)
+    logger.info("%s - binding broadcast %s to stream", camera.name, broadcast_id)
 
     # Binds the new broadcast to default stream (this assumes that only one stream per account)
     youtube.liveBroadcasts().bind(
@@ -98,9 +100,9 @@ def do_schedule(youtube, camera):
     ).execute()
 
 
-def end_schedule(youtube, camera):
+def end_schedule(youtube, camera: CameraConfig):
     broadcast_id = get_scheduled_broadcast_id(youtube)
-    logger.info("%s - ending YouTube broadcast %s", camera["name"], broadcast_id)
+    logger.info("%s - ending YouTube broadcast %s", camera.name, broadcast_id)
     youtube.liveBroadcasts().transition(
         broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
     ).execute()

@@ -9,7 +9,17 @@ import pytest
 SOURCE_DIR = Path(__file__).resolve().parents[1] / "source"
 sys.path.insert(0, str(SOURCE_DIR))
 
+from camera_config import CameraConfig
+
 import youtube_schedule
+
+
+def make_camera():
+    return CameraConfig(
+        name="cam1",
+        title="Back Garden",
+        description="Live camera",
+    )
 
 
 class FixedDatetime(datetime.datetime):
@@ -55,11 +65,7 @@ def test_schedule_broadcast_writes_utc_start_time(monkeypatch):
     """Verify that broadcast scheduling sends the UTC timestamp in the request body."""
     monkeypatch.setattr(youtube_schedule.datetime, "datetime", FixedDatetime)
     youtube = FakeYoutube()
-    camera = {
-        "name": "cam1",
-        "title": "Back Garden",
-        "description": "Live camera",
-    }
+    camera = make_camera()
 
     youtube_schedule.schedule_broadcast(youtube, camera)
 
