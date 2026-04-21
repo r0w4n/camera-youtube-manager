@@ -30,36 +30,36 @@ def kill_stream(camera: CameraConfig):
         )
 
 
+def build_stream_command(camera: CameraConfig):
+    return [
+        "screen",
+        "-dS",
+        get_screen_name(camera),
+        "-m",
+        "ffmpeg",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc",
+        "-rtsp_transport",
+        "tcp",
+        "-i",
+        f"rtsp://{camera.url}",
+        "-vcodec",
+        "libx264",
+        "-pix_fmt",
+        "+",
+        "-c:v",
+        "copy",
+        "-f",
+        "flv",
+        f"rtmp://a.rtmp.youtube.com/live2/{camera.key}",
+    ]
+
+
 def start_stream(camera: CameraConfig):
-    screen_name = get_screen_name(camera)
     logger.info("%s - starting ffmpeg stream", camera.name)
-    result = subprocess.run(
-        [
-            "screen",
-            "-dS",
-            screen_name,
-            "-m",
-            "ffmpeg",
-            "-f",
-            "lavfi",
-            "-i",
-            "anullsrc",
-            "-rtsp_transport",
-            "tcp",
-            "-i",
-            f"rtsp://{camera.url}",
-            "-vcodec",
-            "libx264",
-            "-pix_fmt",
-            "+",
-            "-c:v",
-            "copy",
-            "-f",
-            "flv",
-            f"rtmp://a.rtmp.youtube.com/live2/{camera.key}",
-        ],
-        check=False,
-    )
+    result = subprocess.run(build_stream_command(camera), check=False)
     exit_status = result.returncode
     if exit_status != 0:
         logger.warning(
