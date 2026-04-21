@@ -197,6 +197,12 @@ Run the test suite locally with:
 pytest -q
 ```
 
+To see line coverage locally:
+
+```bash
+pytest -q --cov=source --cov-report=term-missing
+```
+
 ## Operational Notes
 
 Current behaviour worth knowing:
