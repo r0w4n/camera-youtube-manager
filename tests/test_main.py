@@ -91,6 +91,19 @@ def test_main_skips_later_checks_after_creating_schedule(main_module):
     main.manage_inactive_broadcast.assert_not_called()
 
 
+def test_main_skips_disabled_camera(main_module):
+    """Verify that disabled cameras are skipped before any camera processing starts."""
+    main = main_module["main"]
+    camera = make_camera(enabled=False)
+
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
+    main.process_camera = Mock()
+
+    main.main()
+
+    main.process_camera.assert_not_called()
+
+
 def test_main_skips_inactive_check_after_restarting_unhealthy_stream(main_module):
     """Verify that an unhealthy stream restart skips the inactive broadcast check."""
     main = main_module["main"]
@@ -139,6 +152,29 @@ def test_main_checks_inactive_broadcast_when_stream_is_healthy(main_module):
     main.manage_schedule.assert_not_called()
     main.manage_unhealthy_stream.assert_not_called()
     main.manage_inactive_broadcast.assert_called_once_with(camera)
+
+
+def test_main_recycles_scheduled_broadcast_before_other_checks(main_module):
+    """Verify that the recycle path runs when the recycle window is reached."""
+    main = main_module["main"]
+    youtube = object()
+    camera = make_camera()
+
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
+    main_module["youtube_auth"].handle_auth = Mock(return_value="credentials")
+    main.build = Mock(return_value=youtube)
+    main.is_recycle_time = Mock(return_value=True)
+    main.manage_ending_broadcast = Mock()
+    main.manage_schedule = Mock()
+
+    main_module["youtube_schedule"].has_scheduled_broadcast = Mock(side_effect=[True, True])
+    main_module["youtube_streamer"].is_live_stream_healthy = Mock(return_value=True)
+    main_module["youtube_schedule"].has_inactive_broadcast = Mock(return_value=False)
+
+    main.main()
+
+    main.manage_ending_broadcast.assert_called_once_with(camera, youtube)
+    main.manage_schedule.assert_not_called()
 
 
 def test_manage_schedule_creates_broadcast_and_starts_stream(main_module):
@@ -225,6 +261,21 @@ def test_main_continues_to_next_camera_after_unexpected_error(main_module):
     main.logger.exception.assert_called_once()
 
 
+def test_stop_stream_if_running_kills_stream_and_waits(main_module):
+    """Verify that stopping a running stream also waits before continuing."""
+    main = main_module["main"]
+    camera = make_camera()
+
+    main_module["youtube_streamer"].is_streaming = Mock(return_value=True)
+    main_module["youtube_streamer"].kill_stream = Mock()
+    main.time.sleep = Mock()
+
+    main.stop_stream_if_running(camera)
+
+    main_module["youtube_streamer"].kill_stream.assert_called_once_with(camera)
+    main.time.sleep.assert_called_once_with(5)
+
+
 def test_manage_inactive_broadcast_leaves_running_stream_alone(main_module):
     """Verify that a running local stream is not killed when YouTube still says ready."""
     main = main_module["main"]
@@ -238,3 +289,16 @@ def test_manage_inactive_broadcast_leaves_running_stream_alone(main_module):
 
     main_module["youtube_streamer"].kill_stream.assert_not_called()
     main_module["youtube_streamer"].start_stream.assert_not_called()
+
+
+def test_manage_inactive_broadcast_starts_stream_when_not_running(main_module):
+    """Verify that an inactive broadcast starts the local stream when needed."""
+    main = main_module["main"]
+    camera = make_camera()
+
+    main_module["youtube_streamer"].is_streaming = Mock(return_value=False)
+    main_module["youtube_streamer"].start_stream = Mock()
+
+    main.manage_inactive_broadcast(camera)
+
+    main_module["youtube_streamer"].start_stream.assert_called_once_with(camera)
