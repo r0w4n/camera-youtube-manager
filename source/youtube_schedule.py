@@ -59,28 +59,28 @@ def get_default_stream_id(youtube):
     return streams["items"][0]["id"]
 
 
-def has_scheduled_broadcast(youtube):
+def get_broadcasts(youtube):
     response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
+    return response["items"]
 
-    if [x for x in response["items"] if x["status"]["lifeCycleStatus"] != "complete"]:
-        return True
 
-    return False
+def has_scheduled_broadcast(youtube):
+    return any(
+        broadcast["status"]["lifeCycleStatus"] != "complete"
+        for broadcast in get_broadcasts(youtube)
+    )
 
 
 def has_inactive_broadcast(youtube):
-    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
-
-    if [x for x in response["items"] if x["status"]["lifeCycleStatus"] == "ready"]:
-        return True
-
-    return False
+    return any(
+        broadcast["status"]["lifeCycleStatus"] == "ready"
+        for broadcast in get_broadcasts(youtube)
+    )
 
 
 def get_scheduled_broadcast_id(youtube):
-    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
     live_stream = [
-        x for x in response["items"] if x["status"]["lifeCycleStatus"] != "complete"
+        x for x in get_broadcasts(youtube) if x["status"]["lifeCycleStatus"] != "complete"
     ]
     return live_stream[0]["id"]
 
