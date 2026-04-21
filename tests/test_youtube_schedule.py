@@ -124,6 +124,7 @@ def test_has_scheduled_broadcast_returns_true_for_non_complete_broadcast():
     )
 
     assert youtube_schedule.has_scheduled_broadcast(youtube) is True
+    assert youtube.broadcasts.list_kwargs == {"part": "status", "mine": True}
 
 
 def test_has_scheduled_broadcast_returns_false_when_all_are_complete():
@@ -171,6 +172,65 @@ def test_get_scheduled_broadcast_id_returns_first_non_complete_broadcast():
     )
 
     assert youtube_schedule.get_scheduled_broadcast_id(youtube) == "broadcast-2"
+
+
+def test_should_recycle_broadcast_returns_true_for_broadcast_created_before_window():
+    """Verify that older broadcasts recycle when the recycle hour arrives."""
+    youtube = FakeYoutube(
+        broadcast_items=[
+            {
+                "id": "broadcast-1",
+                "status": {"lifeCycleStatus": "ready"},
+                "snippet": {"scheduledStartTime": "2026-04-21T06:30:00Z"},
+            }
+        ]
+    )
+    recycle_window_start = datetime.datetime(
+        2026, 4, 21, 8, 0, 0, tzinfo=datetime.timezone.utc
+    )
+
+    assert (
+        youtube_schedule.should_recycle_broadcast(youtube, recycle_window_start) is True
+    )
+    assert youtube.broadcasts.list_kwargs == {"part": "snippet,status", "mine": True}
+
+
+def test_should_recycle_broadcast_returns_false_after_recycling_this_hour():
+    """Verify that a broadcast created this recycle hour is not recycled again."""
+    youtube = FakeYoutube(
+        broadcast_items=[
+            {
+                "id": "broadcast-1",
+                "status": {"lifeCycleStatus": "ready"},
+                "snippet": {"scheduledStartTime": "2026-04-21T08:05:00Z"},
+            }
+        ]
+    )
+    recycle_window_start = datetime.datetime(
+        2026, 4, 21, 8, 0, 0, tzinfo=datetime.timezone.utc
+    )
+
+    assert (
+        youtube_schedule.should_recycle_broadcast(youtube, recycle_window_start)
+        is False
+    )
+
+
+def test_should_recycle_broadcast_returns_false_without_active_broadcast():
+    """Verify that recycle logic stays off when there is no active broadcast."""
+    youtube = FakeYoutube(
+        broadcast_items=[
+            {"id": "broadcast-1", "status": {"lifeCycleStatus": "complete"}},
+        ]
+    )
+    recycle_window_start = datetime.datetime(
+        2026, 4, 21, 8, 0, 0, tzinfo=datetime.timezone.utc
+    )
+
+    assert (
+        youtube_schedule.should_recycle_broadcast(youtube, recycle_window_start)
+        is False
+    )
 
 
 def test_do_schedule_binds_created_broadcast_to_default_stream(monkeypatch):
