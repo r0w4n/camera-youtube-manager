@@ -68,6 +68,8 @@ def process_camera(camera: CameraConfig):
 
     except HttpError as err:
         logger.exception("%s - YouTube API request failed: %s", camera.name, err)
+    except Exception as err:
+        logger.exception("%s - camera check failed: %s", camera.name, err)
 
 
 def is_recycle_time():

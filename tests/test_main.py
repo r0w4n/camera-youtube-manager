@@ -191,6 +191,40 @@ def test_main_continues_to_next_camera_after_http_error(main_module):
     main.logger.exception.assert_called_once()
 
 
+def test_main_continues_to_next_camera_after_unexpected_error(main_module):
+    """Verify that one camera's unexpected failure does not stop later cameras."""
+    main = main_module["main"]
+    camera1 = make_camera(name="cam1")
+    camera2 = make_camera(name="cam2")
+    youtube2 = object()
+
+    main_module["settings"].get_settings = Mock(
+        return_value=AppSettings(cameras=[camera1, camera2])
+    )
+    main_module["youtube_auth"].handle_auth = Mock(side_effect=["cred1", "cred2"])
+    main.build = Mock(side_effect=[RuntimeError("boom"), youtube2])
+    main.is_recycle_time = Mock(return_value=False)
+    main.logger.exception = Mock()
+
+    main_module["youtube_schedule"].has_scheduled_broadcast = Mock(return_value=True)
+    main_module["youtube_streamer"].is_live_stream_healthy = Mock(return_value=True)
+    main_module["youtube_schedule"].has_inactive_broadcast = Mock(return_value=False)
+
+    main.main()
+
+    assert main.build.call_count == 2
+    main_module["youtube_schedule"].has_scheduled_broadcast.assert_called_once_with(
+        youtube2
+    )
+    main_module["youtube_streamer"].is_live_stream_healthy.assert_called_once_with(
+        camera2, youtube2
+    )
+    main_module["youtube_schedule"].has_inactive_broadcast.assert_called_once_with(
+        youtube2
+    )
+    main.logger.exception.assert_called_once()
+
+
 def test_manage_inactive_broadcast_leaves_running_stream_alone(main_module):
     """Verify that a running local stream is not killed when YouTube still says ready."""
     main = main_module["main"]
