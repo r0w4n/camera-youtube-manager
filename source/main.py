@@ -33,40 +33,38 @@ def main():
             logger.info("%s - camera disabled; skipping", camera["name"])
             continue
 
-        logger.info("%s - checking camera", camera["name"])
+        process_camera(camera)
 
-        try:
-            # Build the YouTube service object and builds the credential object
-            youtube = build(
-                "youtube",
-                "v3",
-                credentials=youtube_auth.handle_auth(camera["name"]),
-                cache_discovery=False,
-            )
+def process_camera(camera):
+    logger.info("%s - checking camera", camera["name"])
 
-            # Check to see if it time to recycle and if it is kill the current schedule
-            if is_recycle_time() and youtube_schedule.has_scheduled_broadcast(youtube):
-                manage_ending_broadcast(camera, youtube)
+    try:
+        youtube = build(
+            "youtube",
+            "v3",
+            credentials=youtube_auth.handle_auth(camera["name"]),
+            cache_discovery=False,
+        )
 
-            # Checks to see whether there are any scheduled broadcasts and if there isn't creates a schedule
-            if not youtube_schedule.has_scheduled_broadcast(youtube):
-                manage_schedule(camera, youtube)
-                continue
+        if is_recycle_time() and youtube_schedule.has_scheduled_broadcast(youtube):
+            manage_ending_broadcast(camera, youtube)
 
-            # checks to see whether there are any unhealthy streams and if there are kill them
-            if not youtube_streamer.is_live_stream_healthy(camera, youtube):
-                manage_unhealthy_stream(camera)
-                continue
+        if not youtube_schedule.has_scheduled_broadcast(youtube):
+            manage_schedule(camera, youtube)
+            return
 
-            # checks to see whether a scheduled broadcast is inactive
-            if youtube_schedule.has_inactive_broadcast(youtube):
-                manage_inactive_broadcast(camera)
-                continue
+        if not youtube_streamer.is_live_stream_healthy(camera, youtube):
+            manage_unhealthy_stream(camera)
+            return
 
-            logger.info("%s - healthy; no action needed", camera["name"])
+        if youtube_schedule.has_inactive_broadcast(youtube):
+            manage_inactive_broadcast(camera)
+            return
 
-        except HttpError as err:
-            logger.exception("%s - YouTube API request failed: %s", camera["name"], err)
+        logger.info("%s - healthy; no action needed", camera["name"])
+
+    except HttpError as err:
+        logger.exception("%s - YouTube API request failed: %s", camera["name"], err)
 
 
 def is_recycle_time():
