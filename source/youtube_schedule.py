@@ -1,10 +1,20 @@
 import datetime
 import logging
+from dataclasses import dataclass
+from typing import Optional
 
 from camera_config import CameraConfig
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RecycleDecision:
+    should_recycle: bool
+    reason: str
+    broadcast_id: Optional[str] = None
+    scheduled_start_time: Optional[datetime.datetime] = None
 
 
 def get_scheduled_start_time():
@@ -61,16 +71,24 @@ def get_default_stream_id(youtube):
     return streams["items"][0]["id"]
 
 
-def get_broadcasts(youtube):
-    response = youtube.liveBroadcasts().list(part="status", mine=True).execute()
+def parse_youtube_datetime(datetime_text):
+    return datetime.datetime.fromisoformat(datetime_text.replace("Z", "+00:00"))
+
+
+def get_broadcasts(youtube, part="status"):
+    response = youtube.liveBroadcasts().list(part=part, mine=True).execute()
     return response["items"]
 
 
+def get_active_broadcast(youtube, part="status"):
+    for broadcast in get_broadcasts(youtube, part=part):
+        if broadcast["status"]["lifeCycleStatus"] != "complete":
+            return broadcast
+    return None
+
+
 def has_scheduled_broadcast(youtube):
-    return any(
-        broadcast["status"]["lifeCycleStatus"] != "complete"
-        for broadcast in get_broadcasts(youtube)
-    )
+    return get_active_broadcast(youtube) is not None
 
 
 def has_inactive_broadcast(youtube):
@@ -81,10 +99,47 @@ def has_inactive_broadcast(youtube):
 
 
 def get_scheduled_broadcast_id(youtube):
-    live_stream = [
-        x for x in get_broadcasts(youtube) if x["status"]["lifeCycleStatus"] != "complete"
-    ]
-    return live_stream[0]["id"]
+    broadcast = get_active_broadcast(youtube)
+    return broadcast["id"]
+
+
+def get_recycle_decision(youtube, recycle_window_start):
+    if recycle_window_start.tzinfo is None:
+        recycle_window_start = recycle_window_start.astimezone()
+
+    broadcast = get_active_broadcast(youtube, part="snippet,status")
+    if broadcast is None:
+        return RecycleDecision(should_recycle=False, reason="no_active_broadcast")
+
+    broadcast_id = broadcast["id"]
+
+    scheduled_start_time_text = broadcast.get("snippet", {}).get("scheduledStartTime")
+    if not scheduled_start_time_text:
+        return RecycleDecision(
+            should_recycle=True,
+            reason="missing_scheduled_start_time",
+            broadcast_id=broadcast_id,
+        )
+
+    scheduled_start_time = parse_youtube_datetime(scheduled_start_time_text)
+    if scheduled_start_time < recycle_window_start:
+        return RecycleDecision(
+            should_recycle=True,
+            reason="older_than_recycle_window",
+            broadcast_id=broadcast_id,
+            scheduled_start_time=scheduled_start_time,
+        )
+
+    return RecycleDecision(
+        should_recycle=False,
+        reason="already_recycled_this_hour",
+        broadcast_id=broadcast_id,
+        scheduled_start_time=scheduled_start_time,
+    )
+
+
+def should_recycle_broadcast(youtube, recycle_window_start):
+    return get_recycle_decision(youtube, recycle_window_start).should_recycle
 
 
 def do_schedule(youtube, camera: CameraConfig):

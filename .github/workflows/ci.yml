@@ -29,5 +29,5 @@ jobs:
       - name: Compile Python files
         run: python -m compileall source tests
 
-      - name: Run test suite
-        run: pytest -q
+      - name: Run test suite with coverage
+        run: pytest -q --cov=source --cov-report=term-missing

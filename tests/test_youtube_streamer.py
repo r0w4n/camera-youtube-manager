@@ -63,6 +63,34 @@ def test_is_live_stream_healthy_returns_true_for_good_status():
     assert youtube_streamer.is_live_stream_healthy(camera, youtube) is True
 
 
+def test_is_live_stream_healthy_returns_true_for_ok_status():
+    """Verify that an ok YouTube health status is treated as healthy."""
+    camera = make_camera()
+    youtube = FakeYoutube(
+        {"items": [{"status": {"healthStatus": {"status": "ok"}}}]}
+    )
+
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is True
+
+
+def test_is_live_stream_healthy_returns_false_for_no_data_status():
+    """Verify that a noData health status is treated as unhealthy."""
+    camera = make_camera()
+    youtube = FakeYoutube(
+        {"items": [{"status": {"healthStatus": {"status": "noData"}}}]}
+    )
+
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is False
+
+
+def test_is_live_stream_healthy_returns_false_when_status_is_missing():
+    """Verify that missing health status data is treated as unhealthy."""
+    camera = make_camera()
+    youtube = FakeYoutube({"items": [{"status": {}}]})
+
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is False
+
+
 def test_start_stream_passes_special_characters_without_shell_parsing(monkeypatch):
     """Verify that stream startup uses a subprocess argument list, not a shell string."""
     camera = make_camera(
@@ -114,6 +142,55 @@ def test_kill_stream_uses_argument_list(monkeypatch):
     run_mock.assert_called_once_with(
         ["screen", "-X", "-S", "youtube_cam1", "quit"], check=False
     )
+
+
+def test_start_stream_logs_warning_when_ffmpeg_launch_fails(monkeypatch):
+    """Verify that ffmpeg launch failures are logged for observability."""
+    camera = make_camera()
+    run_mock = Mock(return_value=SimpleNamespace(returncode=1))
+    warning_mock = Mock()
+    monkeypatch.setattr(youtube_streamer.subprocess, "run", run_mock)
+    monkeypatch.setattr(youtube_streamer.logger, "warning", warning_mock)
+
+    youtube_streamer.start_stream(camera)
+
+    warning_mock.assert_called_once_with(
+        "%s - ffmpeg launch command exited with status %s",
+        camera.name,
+        1,
+    )
+
+
+def test_kill_stream_logs_warning_when_screen_quit_fails(monkeypatch):
+    """Verify that screen stop failures are logged for observability."""
+    camera = make_camera()
+    run_mock = Mock(return_value=SimpleNamespace(returncode=1))
+    warning_mock = Mock()
+    monkeypatch.setattr(youtube_streamer.subprocess, "run", run_mock)
+    monkeypatch.setattr(youtube_streamer.logger, "warning", warning_mock)
+
+    youtube_streamer.kill_stream(camera)
+
+    warning_mock.assert_called_once_with(
+        "%s - screen quit command for %s exited with status %s",
+        camera.name,
+        "youtube_cam1",
+        1,
+    )
+
+
+def test_is_streaming_returns_true_for_exact_screen_session_name(monkeypatch):
+    """Verify that an exact screen session match is detected as streaming."""
+    camera = make_camera()
+    run_mock = Mock(
+        return_value=SimpleNamespace(
+            returncode=0,
+            stdout="\t1234.youtube_cam1\t(Detached)\n",
+        )
+    )
+    monkeypatch.setattr(youtube_streamer.subprocess, "run", run_mock)
+
+    assert youtube_streamer.is_streaming(camera) is True
 
 
 def test_is_streaming_matches_exact_screen_session_name(monkeypatch):

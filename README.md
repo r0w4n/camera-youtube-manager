@@ -197,11 +197,17 @@ Run the test suite locally with:
 pytest -q
 ```
 
+To see line coverage locally:
+
+```bash
+pytest -q --cov=source --cov-report=term-missing
+```
+
 ## Operational Notes
 
 Current behaviour worth knowing:
 
-- broadcasts are recycled at `02:00`, `08:00`, and `20:00`
+- broadcasts are recycled once during the `02:00`, `08:00`, and `20:00` hours
 - the script is designed to be run repeatedly, for example from cron or a service/timer
 - each camera should use its own YouTube account
 
