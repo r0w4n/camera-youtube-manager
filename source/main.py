@@ -75,6 +75,13 @@ def is_recycle_time():
     return False
 
 
+def stop_stream_if_running(camera):
+    if youtube_streamer.is_streaming(camera):
+        logger.info("%s - killing screen session", camera["name"])
+        youtube_streamer.kill_stream(camera)
+        time.sleep(5)
+
+
 def manage_ending_broadcast(camera, youtube):
     logger.info(
         "%s - recycle window reached with a scheduled stream on YouTube",
@@ -82,18 +89,12 @@ def manage_ending_broadcast(camera, youtube):
     )
     logger.info("%s - ending scheduled broadcast", camera["name"])
     youtube_schedule.end_schedule(youtube, camera)
-    if youtube_streamer.is_streaming(camera):
-        logger.info("%s - killing screen session", camera["name"])
-        youtube_streamer.kill_stream(camera)
-        time.sleep(5)
+    stop_stream_if_running(camera)
 
 
 def manage_schedule(camera, youtube):
     logger.info("%s - no scheduled stream on YouTube", camera["name"])
-    if youtube_streamer.is_streaming(camera):
-        logger.info("%s - killing existing screen session", camera["name"])
-        youtube_streamer.kill_stream(camera)
-        time.sleep(5)
+    stop_stream_if_running(camera)
     logger.info("%s - creating scheduled broadcast", camera["name"])
     youtube_schedule.do_schedule(youtube, camera)
     logger.info("%s - starting stream", camera["name"])
@@ -102,10 +103,7 @@ def manage_schedule(camera, youtube):
 
 def manage_unhealthy_stream(camera):
     logger.warning("%s - stream on YouTube is unhealthy", camera["name"])
-    if youtube_streamer.is_streaming(camera):
-        logger.info("%s - killing screen session", camera["name"])
-        youtube_streamer.kill_stream(camera)
-        time.sleep(5)
+    stop_stream_if_running(camera)
     logger.info("%s - starting stream", camera["name"])
     youtube_streamer.start_stream(camera)
 
