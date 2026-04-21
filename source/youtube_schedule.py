@@ -1,12 +1,30 @@
 import datetime
+import logging
 
 
-def schedule_broadcast(youtube, title, description):
+logger = logging.getLogger(__name__)
+
+
+def get_scheduled_start_time():
+    return (
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def schedule_broadcast(youtube, camera):
+    logger.info(
+        '%s - creating YouTube broadcast with title "%s"',
+        camera["name"],
+        camera["title"],
+    )
     content = {
         "snippet": {
-            "title": title,
-            "description": description,
-            "scheduledStartTime": datetime.datetime.now().isoformat() + "Z",
+            "title": camera["title"],
+            "description": camera["description"],
+            "scheduledStartTime": get_scheduled_start_time(),
         },
         "status": {
             "privacyStatus": "public",
@@ -32,6 +50,7 @@ def schedule_broadcast(youtube, title, description):
         .execute()
     )
 
+    logger.info("%s - created YouTube broadcast %s", camera["name"], response["id"])
     return response["id"]
 
 
@@ -68,7 +87,8 @@ def get_scheduled_broadcast_id(youtube):
 
 def do_schedule(youtube, camera):
     # Schedules a broadcast
-    broadcast_id = schedule_broadcast(youtube, camera["title"], camera["description"])
+    broadcast_id = schedule_broadcast(youtube, camera)
+    logger.info("%s - binding broadcast %s to stream", camera["name"], broadcast_id)
 
     # Binds the new broadcast to default stream (this assumes that only one stream per account)
     youtube.liveBroadcasts().bind(
@@ -78,7 +98,9 @@ def do_schedule(youtube, camera):
     ).execute()
 
 
-def end_schedule(youtube):
+def end_schedule(youtube, camera):
+    broadcast_id = get_scheduled_broadcast_id(youtube)
+    logger.info("%s - ending YouTube broadcast %s", camera["name"], broadcast_id)
     youtube.liveBroadcasts().transition(
-        broadcastStatus="complete", id=get_scheduled_broadcast_id(youtube), part="id,snippet,status"
+        broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
     ).execute()
