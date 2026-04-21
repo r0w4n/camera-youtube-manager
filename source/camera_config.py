@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import List
 
 
 REQUIRED_CAMERA_FIELDS = ("name", "title", "url", "key")
@@ -39,7 +40,7 @@ class CameraConfig:
 
 @dataclass(frozen=True)
 class AppSettings:
-    cameras: list[CameraConfig] = field(default_factory=list)
+    cameras: List[CameraConfig] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data):
