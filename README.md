@@ -70,7 +70,7 @@ Typical Raspberry Pi package installation:
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-pip ffmpeg screen
+sudo apt install -y git python3 python3-pip ffmpeg screen logrotate
 ```
 
 ### Python Dependencies
@@ -95,7 +95,9 @@ Before the service can run successfully, you also need:
 - a Google Cloud project
 - YouTube Data API access for that project
 - an OAuth client downloaded as `client_secret.json`
-- one YouTube account per camera
+- a YouTube channel enabled for live streaming
+- remember that one YouTube channel can only run one live stream at a time
+- one YouTube account/channel per camera if you want simultaneous camera streams
 - a valid YouTube stream key for each camera/account
 
 Place `client_secret.json` in the project root.
@@ -156,11 +158,22 @@ Example:
 
 On the first run for each camera, the application will open the OAuth flow and ask you to authorise the relevant YouTube account.
 
+In practice, that means:
+
+- run `python3 source/main.py` manually before enabling cron
+- the script starts Google's installed-app OAuth flow on the local machine
+- a browser window should open, or you will be given a local Google authorisation URL to open yourself
+- sign in to the YouTube account/channel for that camera
+- click `Allow` when Google asks for permission
+- once Google redirects back to the local callback, the script saves the token file automatically
+
 Once completed, it stores the token in:
 
 - `tokens/<camera_name>_token.json`
 
 After that, future runs will reuse or refresh the saved credentials automatically.
+
+If the Pi is headless, do this first run from a session where you can complete the browser sign-in on the Pi.
 
 ## Running the Manager
 
@@ -220,15 +233,173 @@ This project is a good fit for a Raspberry Pi that:
 - can reach both the cameras and YouTube
 - runs this script on a schedule
 
-Typical deployment pattern:
+The steps below assume the service will run as your normal Pi user and that the repository lives at `~/camera-youtube-manager`. That keeps the cron entry simple and makes it obvious where `settings.json`, `client_secret.json`, and the saved OAuth tokens live.
 
-1. Install system packages.
-2. Install Python dependencies.
-3. Add `client_secret.json`.
-4. Create `settings.json`.
-5. Create the `tokens/` directory.
-6. Run the script once interactively to complete OAuth.
-7. Run it repeatedly using cron, systemd, or another scheduler.
+### 1. Install the dependencies
+
+Install the system packages first:
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-pip ffmpeg screen logrotate
+```
+
+Then install the Python packages used by this project:
+
+```bash
+cd ~
+git clone https://github.com/r0w4n/camera-youtube-manager.git
+cd ~/camera-youtube-manager
+pip3 install -r requirements.txt
+mkdir -p ~/camera-youtube-manager/tokens
+```
+
+If you already have the repository on the Pi and just want to update it:
+
+```bash
+cd ~/camera-youtube-manager
+git pull
+pip3 install -r requirements.txt
+```
+
+### 2. Put the script in the correct directory
+
+The cron example later in this guide expects the code to be in:
+
+```text
+~/camera-youtube-manager
+```
+
+That means the main script path will be:
+
+```text
+~/camera-youtube-manager/source/main.py
+```
+
+If you install it somewhere else, update the cron command and any notes below to match your chosen location.
+
+### 3. Add `client_secret.json`
+
+Copy the OAuth client downloaded from Google Cloud into the project root:
+
+```text
+~/camera-youtube-manager/client_secret.json
+```
+
+### 4. Configure `settings.json`
+
+Create `~/camera-youtube-manager/settings.json` using the example earlier in this README.
+
+Important points when filling it in:
+
+- `name` should be short and unique because it is used in log messages and in the `screen` session name
+- `url` must not include the leading `rtsp://` because the code adds that part itself
+- `key` must be the YouTube stream key for the channel that camera should stream to
+- `enabled` lets you temporarily disable a camera without deleting its configuration
+
+### 5. Set up the YouTube side
+
+Before you automate the Pi, make sure the YouTube side is ready:
+
+- enable live streaming on the YouTube channel
+- create or retrieve the correct stream key for each camera
+- remember that a single YouTube channel can only have one live stream at a time
+- if you want multiple cameras live at the same time, give each one its own YouTube account/channel and its own stream key
+
+This project already assumes separate YouTube credentials per camera by saving tokens as:
+
+```text
+tokens/<camera_name>_token.json
+```
+
+### 6. Run the script once manually
+
+Do one interactive run before setting up cron so the OAuth flow can complete and create the token files:
+
+```bash
+cd ~/camera-youtube-manager
+python3 source/main.py
+```
+
+During this run, approve the Google/YouTube access request in the browser for each camera account as prompted.
+
+When approval succeeds, the script writes the saved credentials to:
+
+```text
+~/camera-youtube-manager/tokens/<camera_name>_token.json
+```
+
+### 7. Prepare the log file
+
+If you want to use the home-directory log file from the cron example below, create it once:
+
+```bash
+touch ~/youtube-camera.log
+```
+
+### 8. Add the cron entry
+
+Open your user crontab:
+
+```bash
+crontab -e
+```
+
+Add this line:
+
+```cron
+*/5 * * * * python3 ~/camera-youtube-manager/source/main.py >> ~/youtube-camera.log 2>&1
+```
+
+That runs the manager every five minutes, which fits the way this project is designed to keep checking schedules, stream health, and inactive broadcasts.
+
+### 9. Discard the log daily with logrotate
+
+Create `/etc/logrotate.d/camera-youtube-manager` with contents like this:
+
+```conf
+/home/pi/youtube-camera.log {
+    daily
+    rotate 0
+    missingok
+    notifempty
+    copytruncate
+}
+```
+
+Replace `/home/pi/youtube-camera.log` with the real home-directory path for the user running the cron job.
+
+Because the cron job appends to the file as your normal user, `copytruncate` keeps rotation simple without needing root to recreate the file with specific ownership.
+
+`rotate 0` means old log files are not kept. The current log is discarded each day rather than keeping dated archives.
+
+### 10. Turn on the Raspberry Pi overlay filesystem last
+
+Do this only after:
+
+- the repository is in place
+- `settings.json` is correct
+- `client_secret.json` is present
+- the first OAuth run has completed successfully
+
+Then enable the overlay filesystem from `raspi-config`:
+
+```bash
+sudo raspi-config
+```
+
+In the menu, go to `Advanced Options` and then `Overlay File System`, enable it, and reboot when prompted.
+
+Reasons to do this:
+
+- it reduces SD card wear on a Pi that is writing logs and temporary data regularly
+- it makes the box more resilient to sudden power loss
+- it helps the Pi behave more like a small appliance once the setup is stable
+
+Important trade-off:
+
+- when the overlay filesystem is enabled, changes made to the root filesystem do not persist across reboot unless you disable the overlay first
+- that means future `git pull` updates, package installs, changes to `settings.json`, and re-authorisation work should be done with the overlay temporarily turned off
 
 ## Summary
 
