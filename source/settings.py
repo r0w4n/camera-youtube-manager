@@ -1,9 +1,10 @@
 import json
-import os.path
+from pathlib import Path
+
+from camera_config import AppSettings
 
 
 def get_settings():
-    with open(
-        os.path.dirname(os.path.abspath(__file__)) + "/../settings.json", "r"
-    ) as f:
-        return json.load(f)
+    settings_file_path = Path(__file__).resolve().parent.parent / "settings.json"
+    with settings_file_path.open() as settings_file:
+        return AppSettings.from_dict(json.load(settings_file))

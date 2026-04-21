@@ -9,6 +9,8 @@ import datetime
 import logging
 import os
 
+from camera_config import CameraConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,23 +28,24 @@ def main():
     configure_logging()
 
     camera_settings = settings.get_settings()
-    logger.info("Loaded %s camera configuration(s)", len(camera_settings["cameras"]))
+    logger.info("Loaded %s camera configuration(s)", len(camera_settings.cameras))
 
-    for camera in camera_settings["cameras"]:
-        if not camera["enabled"]:
-            logger.info("%s - camera disabled; skipping", camera["name"])
+    for camera in camera_settings.cameras:
+        if not camera.enabled:
+            logger.info("%s - camera disabled; skipping", camera.name)
             continue
 
         process_camera(camera)
 
-def process_camera(camera):
-    logger.info("%s - checking camera", camera["name"])
+
+def process_camera(camera: CameraConfig):
+    logger.info("%s - checking camera", camera.name)
 
     try:
         youtube = build(
             "youtube",
             "v3",
-            credentials=youtube_auth.handle_auth(camera["name"]),
+            credentials=youtube_auth.handle_auth(camera.name),
             cache_discovery=False,
         )
 
@@ -61,10 +64,10 @@ def process_camera(camera):
             manage_inactive_broadcast(camera)
             return
 
-        logger.info("%s - healthy; no action needed", camera["name"])
+        logger.info("%s - healthy; no action needed", camera.name)
 
     except HttpError as err:
-        logger.exception("%s - YouTube API request failed: %s", camera["name"], err)
+        logger.exception("%s - YouTube API request failed: %s", camera.name, err)
 
 
 def is_recycle_time():
@@ -75,48 +78,48 @@ def is_recycle_time():
     return False
 
 
-def stop_stream_if_running(camera):
+def stop_stream_if_running(camera: CameraConfig):
     if youtube_streamer.is_streaming(camera):
-        logger.info("%s - killing screen session", camera["name"])
+        logger.info("%s - killing screen session", camera.name)
         youtube_streamer.kill_stream(camera)
         time.sleep(5)
 
 
-def manage_ending_broadcast(camera, youtube):
+def manage_ending_broadcast(camera: CameraConfig, youtube):
     logger.info(
         "%s - recycle window reached with a scheduled stream on YouTube",
-        camera["name"],
+        camera.name,
     )
-    logger.info("%s - ending scheduled broadcast", camera["name"])
+    logger.info("%s - ending scheduled broadcast", camera.name)
     youtube_schedule.end_schedule(youtube, camera)
     stop_stream_if_running(camera)
 
 
-def manage_schedule(camera, youtube):
-    logger.info("%s - no scheduled stream on YouTube", camera["name"])
+def manage_schedule(camera: CameraConfig, youtube):
+    logger.info("%s - no scheduled stream on YouTube", camera.name)
     stop_stream_if_running(camera)
-    logger.info("%s - creating scheduled broadcast", camera["name"])
+    logger.info("%s - creating scheduled broadcast", camera.name)
     youtube_schedule.do_schedule(youtube, camera)
-    logger.info("%s - starting stream", camera["name"])
+    logger.info("%s - starting stream", camera.name)
     youtube_streamer.start_stream(camera)
 
 
-def manage_unhealthy_stream(camera):
-    logger.warning("%s - stream on YouTube is unhealthy", camera["name"])
+def manage_unhealthy_stream(camera: CameraConfig):
+    logger.warning("%s - stream on YouTube is unhealthy", camera.name)
     stop_stream_if_running(camera)
-    logger.info("%s - starting stream", camera["name"])
+    logger.info("%s - starting stream", camera.name)
     youtube_streamer.start_stream(camera)
 
 
-def manage_inactive_broadcast(camera):
-    logger.warning("%s - scheduled broadcast has not started", camera["name"])
+def manage_inactive_broadcast(camera: CameraConfig):
+    logger.warning("%s - scheduled broadcast has not started", camera.name)
     if youtube_streamer.is_streaming(camera):
         logger.info(
             "%s - local stream is already running; waiting for YouTube broadcast to activate",
-            camera["name"],
+            camera.name,
         )
         return
-    logger.info("%s - starting stream", camera["name"])
+    logger.info("%s - starting stream", camera.name)
     youtube_streamer.start_stream(camera)
 
 
