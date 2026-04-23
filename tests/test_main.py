@@ -107,6 +107,60 @@ def test_main_skips_disabled_camera(main_module):
     main.process_camera.assert_not_called()
 
 
+def test_main_checks_only_selected_camera(main_module):
+    """Verify that the check action can target a single configured camera."""
+    main = main_module["main"]
+    camera1 = make_camera(name="cam1")
+    camera2 = make_camera(name="cam2")
+
+    main_module["settings"].get_settings = Mock(
+        return_value=AppSettings(cameras=[camera1, camera2])
+    )
+    main.process_camera_action = Mock()
+
+    main.main(["check", "--camera", "cam2"])
+
+    main.process_camera_action.assert_called_once_with(camera2, "check")
+
+
+def test_manual_action_requires_camera_name(main_module):
+    """Verify that manual stream actions require an explicit camera target."""
+    main = main_module["main"]
+    camera = make_camera()
+
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
+
+    with pytest.raises(SystemExit, match="kill requires --camera"):
+        main.main(["kill"])
+
+
+def test_main_exits_when_selected_camera_is_unknown(main_module):
+    """Verify that unknown camera names fail before an action runs."""
+    main = main_module["main"]
+    camera = make_camera(name="cam1")
+
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
+    main.process_camera_action = Mock()
+
+    with pytest.raises(SystemExit, match="Unknown camera 'cam2'"):
+        main.main(["check", "--camera", "cam2"])
+
+    main.process_camera_action.assert_not_called()
+
+
+def test_kill_action_stops_selected_camera_even_when_disabled(main_module):
+    """Verify that manual kill can stop a configured camera that automatic checks skip."""
+    main = main_module["main"]
+    camera = make_camera(enabled=False)
+
+    main_module["settings"].get_settings = Mock(return_value=AppSettings(cameras=[camera]))
+    main.stop_stream_if_running = Mock()
+
+    main.main(["kill", "--camera", camera.name])
+
+    main.stop_stream_if_running.assert_called_once_with(camera)
+
+
 def test_main_skips_inactive_check_after_restarting_unhealthy_stream(main_module):
     """Verify that an unhealthy stream restart skips the inactive broadcast check."""
     main = main_module["main"]
@@ -222,6 +276,25 @@ def test_manage_schedule_creates_broadcast_and_starts_stream(main_module):
 
     main_module["youtube_schedule"].do_schedule.assert_called_once_with(youtube, camera)
     main_module["youtube_streamer"].start_stream.assert_called_once_with(camera)
+
+
+def test_restart_stream_stops_before_starting(main_module):
+    """Verify that manual restart replaces the local stream process."""
+    main = main_module["main"]
+    camera = make_camera()
+    call_order = []
+
+    main.stop_stream_if_running = Mock(side_effect=lambda cam: call_order.append(("stop", cam)))
+    main_module["youtube_streamer"].start_stream = Mock(
+        side_effect=lambda cam: call_order.append(("start", cam))
+    )
+
+    main.restart_stream(camera)
+
+    assert call_order == [
+        ("stop", camera),
+        ("start", camera),
+    ]
 
 
 def test_main_continues_to_next_camera_after_http_error(main_module):
@@ -432,4 +505,31 @@ def test_manage_ending_broadcast_stops_stream_before_ending_schedule(main_module
     assert call_order == [
         ("stop", camera),
         ("end", youtube, camera),
+    ]
+
+
+def test_recycle_camera_ends_broadcast_creates_schedule_and_starts_stream(main_module):
+    """Verify that manual recycle recreates the YouTube broadcast and local stream."""
+    main = main_module["main"]
+    camera = make_camera()
+    youtube = object()
+    call_order = []
+
+    main.build_youtube_client = Mock(return_value=youtube)
+    main.manage_ending_broadcast = Mock(
+        side_effect=lambda cam, yt: call_order.append(("end", cam, yt))
+    )
+    main_module["youtube_schedule"].do_schedule = Mock(
+        side_effect=lambda yt, cam: call_order.append(("schedule", yt, cam))
+    )
+    main_module["youtube_streamer"].start_stream = Mock(
+        side_effect=lambda cam: call_order.append(("start", cam))
+    )
+
+    main.recycle_camera(camera)
+
+    assert call_order == [
+        ("end", camera, youtube),
+        ("schedule", youtube, camera),
+        ("start", camera),
     ]

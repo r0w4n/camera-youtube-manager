@@ -184,6 +184,34 @@ Run it directly with:
 python3 source/main.py
 ```
 
+With no parameters, the manager runs the normal watchdog check for every enabled
+camera. This is the same mode used by cron.
+
+You can also run targeted manual actions by passing an action and a camera name:
+
+```bash
+python3 source/main.py check --camera cam1
+python3 source/main.py kill --camera cam1
+python3 source/main.py restart --camera cam1
+python3 source/main.py recycle --camera cam1
+```
+
+Manual actions:
+
+- `check`
+  Runs the same watchdog logic as cron. Without `--camera`, it checks every
+  enabled camera. With `--camera`, it checks only that camera.
+- `kill`
+  Stops the local `screen` / `ffmpeg` stream for the selected camera.
+- `restart`
+  Stops the selected camera's local stream if it is running, then starts it again.
+- `recycle`
+  Stops the selected camera's stream, ends its current YouTube broadcast, creates
+  a new scheduled broadcast, and starts streaming again.
+
+`kill`, `restart`, and `recycle` require `--camera` so an accidental manual run
+does not operate on every configured stream.
+
 ## Logging
 
 The application logs the main operational events, for example:
@@ -353,6 +381,14 @@ Add this line:
 ```
 
 That runs the manager every five minutes, which fits the way this project is designed to keep checking schedules, stream health, and inactive broadcasts.
+
+Manual commands use the same script but should not be put in cron. For example,
+to recycle one camera on demand:
+
+```bash
+cd ~/camera-youtube-manager
+python3 source/main.py recycle --camera cam1
+```
 
 ### 9. Discard the log daily with logrotate
 
