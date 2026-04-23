@@ -123,8 +123,8 @@ def manage_ending_broadcast(camera: CameraConfig, youtube):
         camera.name,
     )
     logger.info("%s - ending scheduled broadcast", camera.name)
-    youtube_schedule.end_schedule(youtube, camera)
     stop_stream_if_running(camera)
+    youtube_schedule.end_schedule(youtube, camera)
 
 
 def manage_schedule(camera: CameraConfig, youtube):

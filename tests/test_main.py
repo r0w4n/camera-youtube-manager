@@ -381,3 +381,23 @@ def test_manage_inactive_broadcast_starts_stream_when_not_running(main_module):
     main.manage_inactive_broadcast(camera)
 
     main_module["youtube_streamer"].start_stream.assert_called_once_with(camera)
+
+
+def test_manage_ending_broadcast_stops_stream_before_ending_schedule(main_module):
+    """Verify that recycle shutdown stops the local stream before ending the broadcast."""
+    main = main_module["main"]
+    camera = make_camera()
+    youtube = object()
+    call_order = []
+
+    main.stop_stream_if_running = Mock(side_effect=lambda arg: call_order.append(("stop", arg)))
+    main_module["youtube_schedule"].end_schedule = Mock(
+        side_effect=lambda yt, cam: call_order.append(("end", yt, cam))
+    )
+
+    main.manage_ending_broadcast(camera, youtube)
+
+    assert call_order == [
+        ("stop", camera),
+        ("end", youtube, camera),
+    ]

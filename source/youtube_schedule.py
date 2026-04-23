@@ -156,8 +156,39 @@ def do_schedule(youtube, camera: CameraConfig):
 
 
 def end_schedule(youtube, camera: CameraConfig):
-    broadcast_id = get_scheduled_broadcast_id(youtube)
-    logger.info("%s - ending YouTube broadcast %s", camera.name, broadcast_id)
-    youtube.liveBroadcasts().transition(
-        broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
-    ).execute()
+    broadcast = get_active_broadcast(youtube, part="id,status")
+    if broadcast is None:
+        logger.info("%s - no active YouTube broadcast to end", camera.name)
+        return
+
+    broadcast_id = broadcast["id"]
+    life_cycle_status = broadcast.get("status", {}).get("lifeCycleStatus")
+    logger.info(
+        "%s - ending YouTube broadcast %s from %s state",
+        camera.name,
+        broadcast_id,
+        life_cycle_status,
+    )
+
+    if life_cycle_status in {"testing", "live"}:
+        youtube.liveBroadcasts().transition(
+            broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
+        ).execute()
+        return
+
+    if life_cycle_status in {"created", "ready", "testStarting", "liveStarting"}:
+        logger.info(
+            "%s - deleting YouTube broadcast %s because %s cannot transition directly to complete",
+            camera.name,
+            broadcast_id,
+            life_cycle_status,
+        )
+        youtube.liveBroadcasts().delete(id=broadcast_id).execute()
+        return
+
+    logger.warning(
+        "%s - leaving YouTube broadcast %s unchanged because lifecycle status %s is not supported for recycle cleanup",
+        camera.name,
+        broadcast_id,
+        life_cycle_status,
+    )

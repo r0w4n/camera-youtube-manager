@@ -52,6 +52,7 @@ class FakeBroadcasts:
         self.insert_kwargs = None
         self.bind_kwargs = None
         self.transition_kwargs = None
+        self.delete_kwargs = None
 
     def list(self, **kwargs):
         self.list_kwargs = kwargs
@@ -67,6 +68,10 @@ class FakeBroadcasts:
 
     def transition(self, **kwargs):
         self.transition_kwargs = kwargs
+        return FakeRequest({"status": "ok"})
+
+    def delete(self, **kwargs):
+        self.delete_kwargs = kwargs
         return FakeRequest({"status": "ok"})
 
 
@@ -250,11 +255,25 @@ def test_do_schedule_binds_created_broadcast_to_default_stream(monkeypatch):
     }
 
 
-def test_end_schedule_transitions_broadcast_to_complete():
-    """Verify that ending a schedule transitions the selected broadcast to complete."""
+def test_end_schedule_deletes_ready_broadcast():
+    """Verify that ready broadcasts are deleted instead of transitioned to complete."""
     youtube = FakeYoutube(
         broadcast_items=[
             {"id": "broadcast-123", "status": {"lifeCycleStatus": "ready"}},
+        ]
+    )
+
+    youtube_schedule.end_schedule(youtube, make_camera())
+
+    assert youtube.broadcasts.transition_kwargs is None
+    assert youtube.broadcasts.delete_kwargs == {"id": "broadcast-123"}
+
+
+def test_end_schedule_transitions_live_broadcast_to_complete():
+    """Verify that live broadcasts are transitioned to complete."""
+    youtube = FakeYoutube(
+        broadcast_items=[
+            {"id": "broadcast-123", "status": {"lifeCycleStatus": "live"}},
         ]
     )
 
@@ -265,3 +284,4 @@ def test_end_schedule_transitions_broadcast_to_complete():
         "id": "broadcast-123",
         "part": "id,snippet,status",
     }
+    assert youtube.broadcasts.delete_kwargs is None
