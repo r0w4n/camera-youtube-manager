@@ -2,6 +2,8 @@ import datetime
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SOURCE_DIR = Path(__file__).resolve().parents[1] / "source"
 sys.path.insert(0, str(SOURCE_DIR))
@@ -11,11 +13,12 @@ from camera_config import CameraConfig
 import youtube_schedule
 
 
-def make_camera():
+def make_camera(key="stream-key"):
     return CameraConfig(
         name="cam1",
         title="Back Garden",
         description="Live camera",
+        key=key,
     )
 
 
@@ -52,6 +55,7 @@ class FakeBroadcasts:
         self.insert_kwargs = None
         self.bind_kwargs = None
         self.transition_kwargs = None
+        self.delete_kwargs = None
 
     def list(self, **kwargs):
         self.list_kwargs = kwargs
@@ -67,6 +71,10 @@ class FakeBroadcasts:
 
     def transition(self, **kwargs):
         self.transition_kwargs = kwargs
+        return FakeRequest({"status": "ok"})
+
+    def delete(self, **kwargs):
+        self.delete_kwargs = kwargs
         return FakeRequest({"status": "ok"})
 
 
@@ -106,12 +114,53 @@ def test_schedule_broadcast_writes_utc_start_time(monkeypatch):
     )
 
 
-def test_get_default_stream_id_returns_first_stream_id():
-    """Verify that the default stream helper returns the first stream id."""
-    youtube = FakeYoutube(stream_items=[{"id": "stream-123"}])
+def test_schedule_broadcast_disables_monitor_stream_for_autostart(monkeypatch):
+    """Verify that auto-start broadcasts disable monitor stream mode."""
+    monkeypatch.setattr(youtube_schedule.datetime, "datetime", FixedDatetime)
+    youtube = FakeYoutube()
+    camera = make_camera()
 
-    assert youtube_schedule.get_default_stream_id(youtube) == "stream-123"
-    assert youtube.streams.list_kwargs == {"part": "id", "mine": True}
+    youtube_schedule.schedule_broadcast(youtube, camera)
+
+    assert (
+        youtube.broadcasts.insert_kwargs["body"]["contentDetails"]["monitorStream"][
+            "enableMonitorStream"
+        ]
+        is False
+    )
+
+
+def test_get_stream_id_for_key_returns_matching_stream_id():
+    """Verify that the stream lookup matches the configured ingest key."""
+    youtube = FakeYoutube(
+        stream_items=[
+            {
+                "id": "stream-123",
+                "cdn": {"ingestionInfo": {"streamName": "stream-key-123"}},
+            }
+        ]
+    )
+
+    assert (
+        youtube_schedule.get_stream_id_for_key(youtube, "stream-key-123")
+        == "stream-123"
+    )
+    assert youtube.streams.list_kwargs == {"part": "id,cdn", "mine": True}
+
+
+def test_get_stream_id_for_key_raises_when_key_is_unknown():
+    """Verify that unknown stream keys fail clearly instead of binding the wrong stream."""
+    youtube = FakeYoutube(
+        stream_items=[
+            {
+                "id": "stream-123",
+                "cdn": {"ingestionInfo": {"streamName": "stream-key-123"}},
+            }
+        ]
+    )
+
+    with pytest.raises(ValueError, match="does not match any reusable live stream"):
+        youtube_schedule.get_stream_id_for_key(youtube, "different-key")
 
 
 def test_has_scheduled_broadcast_returns_true_for_non_complete_broadcast():
@@ -233,11 +282,16 @@ def test_should_recycle_broadcast_returns_false_without_active_broadcast():
     )
 
 
-def test_do_schedule_binds_created_broadcast_to_default_stream(monkeypatch):
-    """Verify that scheduling binds the new broadcast to the account's default stream."""
+def test_do_schedule_binds_created_broadcast_to_configured_stream(monkeypatch):
+    """Verify that scheduling binds the new broadcast to the configured stream key."""
     monkeypatch.setattr(youtube_schedule.datetime, "datetime", FixedDatetime)
     youtube = FakeYoutube(
-        stream_items=[{"id": "stream-123"}],
+        stream_items=[
+            {
+                "id": "stream-123",
+                "cdn": {"ingestionInfo": {"streamName": "stream-key"}},
+            }
+        ],
         insert_response={"id": "broadcast-123"},
     )
 
@@ -250,11 +304,55 @@ def test_do_schedule_binds_created_broadcast_to_default_stream(monkeypatch):
     }
 
 
-def test_end_schedule_transitions_broadcast_to_complete():
-    """Verify that ending a schedule transitions the selected broadcast to complete."""
+def test_ensure_active_broadcast_bound_to_stream_rebinds_ready_broadcast():
+    """Verify that ready broadcasts are rebound when the configured key maps to a different stream."""
+    youtube = FakeYoutube(
+        broadcast_items=[
+            {
+                "id": "broadcast-123",
+                "status": {"lifeCycleStatus": "ready"},
+                "contentDetails": {"boundStreamId": "stream-old"},
+            }
+        ],
+        stream_items=[
+            {
+                "id": "stream-new",
+                "cdn": {"ingestionInfo": {"streamName": "stream-key"}},
+            }
+        ],
+    )
+
+    stream_id = youtube_schedule.ensure_active_broadcast_bound_to_stream(
+        youtube, make_camera(key="stream-key")
+    )
+
+    assert stream_id == "stream-new"
+    assert youtube.broadcasts.bind_kwargs == {
+        "part": "id,contentDetails",
+        "id": "broadcast-123",
+        "streamId": "stream-new",
+    }
+
+
+def test_end_schedule_deletes_ready_broadcast():
+    """Verify that ready broadcasts are deleted instead of transitioned to complete."""
     youtube = FakeYoutube(
         broadcast_items=[
             {"id": "broadcast-123", "status": {"lifeCycleStatus": "ready"}},
+        ]
+    )
+
+    youtube_schedule.end_schedule(youtube, make_camera())
+
+    assert youtube.broadcasts.transition_kwargs is None
+    assert youtube.broadcasts.delete_kwargs == {"id": "broadcast-123"}
+
+
+def test_end_schedule_transitions_live_broadcast_to_complete():
+    """Verify that live broadcasts are transitioned to complete."""
+    youtube = FakeYoutube(
+        broadcast_items=[
+            {"id": "broadcast-123", "status": {"lifeCycleStatus": "live"}},
         ]
     )
 
@@ -265,3 +363,4 @@ def test_end_schedule_transitions_broadcast_to_complete():
         "id": "broadcast-123",
         "part": "id,snippet,status",
     }
+    assert youtube.broadcasts.delete_kwargs is None

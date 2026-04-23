@@ -43,6 +43,9 @@ def schedule_broadcast(youtube, camera: CameraConfig):
             "selfDeclaredMadeForKids": False,
         },
         "contentDetails": {
+            "monitorStream": {
+                "enableMonitorStream": False,
+            },
             "enableEmbed": True,
             "enableDvr": True,
             "recordFromStart": True,
@@ -66,9 +69,20 @@ def schedule_broadcast(youtube, camera: CameraConfig):
     return response["id"]
 
 
-def get_default_stream_id(youtube):
-    streams = youtube.liveStreams().list(part="id", mine=True).execute()
-    return streams["items"][0]["id"]
+def get_stream_id_for_key(youtube, stream_key):
+    normalized_stream_key = stream_key.strip()
+    streams = youtube.liveStreams().list(part="id,cdn", mine=True).execute()
+
+    for stream in streams["items"]:
+        candidate_key = (
+            stream.get("cdn", {}).get("ingestionInfo", {}).get("streamName", "").strip()
+        )
+        if candidate_key == normalized_stream_key:
+            return stream["id"]
+
+    raise ValueError(
+        "Configured YouTube stream key does not match any reusable live stream"
+    )
 
 
 def parse_youtube_datetime(datetime_text):
@@ -147,17 +161,85 @@ def do_schedule(youtube, camera: CameraConfig):
     broadcast_id = schedule_broadcast(youtube, camera)
     logger.info("%s - binding broadcast %s to stream", camera.name, broadcast_id)
 
-    # Binds the new broadcast to default stream (this assumes that only one stream per account)
+    # Bind the broadcast to the reusable stream whose ingest key matches the camera config.
     youtube.liveBroadcasts().bind(
         part="id,contentDetails",
         id=broadcast_id,
-        streamId=get_default_stream_id(youtube),
+        streamId=get_stream_id_for_key(youtube, camera.key),
     ).execute()
+
+
+def ensure_active_broadcast_bound_to_stream(youtube, camera: CameraConfig):
+    broadcast = get_active_broadcast(youtube, part="id,status,contentDetails")
+    if broadcast is None:
+        return None
+
+    expected_stream_id = get_stream_id_for_key(youtube, camera.key)
+    current_stream_id = broadcast.get("contentDetails", {}).get("boundStreamId")
+    if current_stream_id == expected_stream_id:
+        return expected_stream_id
+
+    life_cycle_status = broadcast.get("status", {}).get("lifeCycleStatus")
+    if life_cycle_status not in {"created", "ready"}:
+        logger.warning(
+            "%s - broadcast %s is bound to stream %s but configured key maps to %s; cannot rebind automatically while status is %s",
+            camera.name,
+            broadcast["id"],
+            current_stream_id,
+            expected_stream_id,
+            life_cycle_status,
+        )
+        return current_stream_id
+
+    logger.warning(
+        "%s - rebinding broadcast %s from stream %s to configured stream %s",
+        camera.name,
+        broadcast["id"],
+        current_stream_id,
+        expected_stream_id,
+    )
+    youtube.liveBroadcasts().bind(
+        part="id,contentDetails",
+        id=broadcast["id"],
+        streamId=expected_stream_id,
+    ).execute()
+    return expected_stream_id
 
 
 def end_schedule(youtube, camera: CameraConfig):
-    broadcast_id = get_scheduled_broadcast_id(youtube)
-    logger.info("%s - ending YouTube broadcast %s", camera.name, broadcast_id)
-    youtube.liveBroadcasts().transition(
-        broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
-    ).execute()
+    broadcast = get_active_broadcast(youtube, part="id,status")
+    if broadcast is None:
+        logger.info("%s - no active YouTube broadcast to end", camera.name)
+        return
+
+    broadcast_id = broadcast["id"]
+    life_cycle_status = broadcast.get("status", {}).get("lifeCycleStatus")
+    logger.info(
+        "%s - ending YouTube broadcast %s from %s state",
+        camera.name,
+        broadcast_id,
+        life_cycle_status,
+    )
+
+    if life_cycle_status in {"testing", "live"}:
+        youtube.liveBroadcasts().transition(
+            broadcastStatus="complete", id=broadcast_id, part="id,snippet,status"
+        ).execute()
+        return
+
+    if life_cycle_status in {"created", "ready", "testStarting", "liveStarting"}:
+        logger.info(
+            "%s - deleting YouTube broadcast %s because %s cannot transition directly to complete",
+            camera.name,
+            broadcast_id,
+            life_cycle_status,
+        )
+        youtube.liveBroadcasts().delete(id=broadcast_id).execute()
+        return
+
+    logger.warning(
+        "%s - leaving YouTube broadcast %s unchanged because lifecycle status %s is not supported for recycle cleanup",
+        camera.name,
+        broadcast_id,
+        life_cycle_status,
+    )

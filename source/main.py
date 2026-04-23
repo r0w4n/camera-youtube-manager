@@ -82,12 +82,16 @@ def process_camera(camera: CameraConfig):
             manage_schedule(camera, youtube)
             return
 
-        if not youtube_streamer.is_live_stream_healthy(camera, youtube):
+        stream_id = youtube_schedule.ensure_active_broadcast_bound_to_stream(
+            youtube, camera
+        )
+
+        if not youtube_streamer.is_live_stream_healthy(camera, youtube, stream_id):
             manage_unhealthy_stream(camera)
             return
 
         if youtube_schedule.has_inactive_broadcast(youtube):
-            manage_inactive_broadcast(camera)
+            manage_inactive_broadcast(camera, youtube)
             return
 
         logger.info("%s - healthy; no action needed", camera.name)
@@ -123,8 +127,8 @@ def manage_ending_broadcast(camera: CameraConfig, youtube):
         camera.name,
     )
     logger.info("%s - ending scheduled broadcast", camera.name)
-    youtube_schedule.end_schedule(youtube, camera)
     stop_stream_if_running(camera)
+    youtube_schedule.end_schedule(youtube, camera)
 
 
 def manage_schedule(camera: CameraConfig, youtube):
@@ -143,13 +147,19 @@ def manage_unhealthy_stream(camera: CameraConfig):
     youtube_streamer.start_stream(camera)
 
 
-def manage_inactive_broadcast(camera: CameraConfig):
+def manage_inactive_broadcast(camera: CameraConfig, youtube):
     logger.warning("%s - scheduled broadcast has not started", camera.name)
     if youtube_streamer.is_streaming(camera):
-        logger.info(
-            "%s - local stream is already running; waiting for YouTube broadcast to activate",
+        logger.warning(
+            "%s - local stream is already running but the YouTube broadcast is still inactive; recreating the scheduled broadcast",
             camera.name,
         )
+        stop_stream_if_running(camera)
+        youtube_schedule.end_schedule(youtube, camera)
+        logger.info("%s - creating scheduled broadcast", camera.name)
+        youtube_schedule.do_schedule(youtube, camera)
+        logger.info("%s - starting stream", camera.name)
+        youtube_streamer.start_stream(camera)
         return
     logger.info("%s - starting stream", camera.name)
     youtube_streamer.start_stream(camera)
