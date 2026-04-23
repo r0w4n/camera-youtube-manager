@@ -13,11 +13,12 @@ from camera_config import CameraConfig
 import youtube_schedule
 
 
-def make_camera():
+def make_camera(key="stream-key"):
     return CameraConfig(
         name="cam1",
         title="Back Garden",
         description="Live camera",
+        key=key,
     )
 
 

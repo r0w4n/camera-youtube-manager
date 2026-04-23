@@ -152,7 +152,8 @@ Example:
 - `url`
   The RTSP target without the leading `rtsp://` because the code adds that prefix.
 - `key`
-  The YouTube stream key for that camera's account.
+  The YouTube stream key for that camera's account. It must match the reusable
+  YouTube live stream that you want broadcasts to bind to.
 
 ## First Run
 

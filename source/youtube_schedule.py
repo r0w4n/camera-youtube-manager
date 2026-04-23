@@ -69,11 +69,6 @@ def schedule_broadcast(youtube, camera: CameraConfig):
     return response["id"]
 
 
-def get_default_stream_id(youtube):
-    streams = youtube.liveStreams().list(part="id,cdn", mine=True).execute()
-    return streams["items"][0]["id"]
-
-
 def get_stream_id_for_key(youtube, stream_key):
     normalized_stream_key = stream_key.strip()
     streams = youtube.liveStreams().list(part="id,cdn", mine=True).execute()
@@ -166,7 +161,7 @@ def do_schedule(youtube, camera: CameraConfig):
     broadcast_id = schedule_broadcast(youtube, camera)
     logger.info("%s - binding broadcast %s to stream", camera.name, broadcast_id)
 
-    # Binds the new broadcast to default stream (this assumes that only one stream per account)
+    # Bind the broadcast to the reusable stream whose ingest key matches the camera config.
     youtube.liveBroadcasts().bind(
         part="id,contentDetails",
         id=broadcast_id,

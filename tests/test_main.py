@@ -364,6 +364,9 @@ def test_main_logs_when_recycle_is_skipped_for_current_hour(main_module):
         )
     )
     main_module["youtube_schedule"].has_scheduled_broadcast = Mock(return_value=True)
+    main_module["youtube_schedule"].ensure_active_broadcast_bound_to_stream = Mock(
+        return_value="stream-123"
+    )
     main_module["youtube_streamer"].is_live_stream_healthy = Mock(return_value=True)
     main_module["youtube_schedule"].has_inactive_broadcast = Mock(return_value=False)
 
@@ -378,30 +381,36 @@ def test_main_logs_when_recycle_is_skipped_for_current_hour(main_module):
     )
 
 
-def test_manage_inactive_broadcast_leaves_running_stream_alone(main_module):
-    """Verify that a running local stream is not killed when YouTube still says ready."""
+def test_manage_inactive_broadcast_recreates_running_stuck_broadcast(main_module):
+    """Verify that a stuck ready broadcast is recreated when the local stream is already running."""
     main = main_module["main"]
     camera = make_camera()
+    youtube = object()
 
     main_module["youtube_streamer"].is_streaming = Mock(return_value=True)
-    main_module["youtube_streamer"].kill_stream = Mock()
+    main.stop_stream_if_running = Mock()
+    main_module["youtube_schedule"].end_schedule = Mock()
+    main_module["youtube_schedule"].do_schedule = Mock()
     main_module["youtube_streamer"].start_stream = Mock()
 
-    main.manage_inactive_broadcast(camera)
+    main.manage_inactive_broadcast(camera, youtube)
 
-    main_module["youtube_streamer"].kill_stream.assert_not_called()
-    main_module["youtube_streamer"].start_stream.assert_not_called()
+    main.stop_stream_if_running.assert_called_once_with(camera)
+    main_module["youtube_schedule"].end_schedule.assert_called_once_with(youtube, camera)
+    main_module["youtube_schedule"].do_schedule.assert_called_once_with(youtube, camera)
+    main_module["youtube_streamer"].start_stream.assert_called_once_with(camera)
 
 
 def test_manage_inactive_broadcast_starts_stream_when_not_running(main_module):
     """Verify that an inactive broadcast starts the local stream when needed."""
     main = main_module["main"]
     camera = make_camera()
+    youtube = object()
 
     main_module["youtube_streamer"].is_streaming = Mock(return_value=False)
     main_module["youtube_streamer"].start_stream = Mock()
 
-    main.manage_inactive_broadcast(camera)
+    main.manage_inactive_broadcast(camera, youtube)
 
     main_module["youtube_streamer"].start_stream.assert_called_once_with(camera)
 
