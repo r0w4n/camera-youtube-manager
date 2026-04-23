@@ -69,19 +69,38 @@ def start_stream(camera: CameraConfig):
         )
 
 
-def is_live_stream_healthy(camera: CameraConfig, youtube):
-    response = youtube.liveStreams().list(part="status", mine=True).execute()
-    statuses = [
-        item.get("status", {}).get("healthStatus", {}).get("status")
-        for item in response.get("items", [])
-    ]
-    is_healthy = any(status in HEALTHY_STREAM_STATUSES for status in statuses)
+def is_live_stream_healthy(camera: CameraConfig, youtube, stream_id):
+    if not stream_id:
+        logger.warning("%s - scheduled broadcast has no bound YouTube stream", camera.name)
+        return False
+
+    response = youtube.liveStreams().list(part="id,status", id=stream_id).execute()
+    stream = next(
+        (item for item in response.get("items", []) if item.get("id") == stream_id),
+        None,
+    )
+    if stream is None:
+        logger.warning(
+            "%s - could not find YouTube live stream %s bound to the scheduled broadcast",
+            camera.name,
+            stream_id,
+        )
+        return False
+
+    status = stream.get("status", {})
+    stream_status = status.get("streamStatus")
+    health_status = status.get("healthStatus", {}).get("status")
+    is_healthy = (
+        stream_status == "active" and health_status in HEALTHY_STREAM_STATUSES
+    )
 
     if not is_healthy:
         logger.warning(
-            "%s - no healthy YouTube live streams detected; statuses=%s",
+            "%s - bound YouTube live stream %s is not healthy; streamStatus=%s healthStatus=%s",
             camera.name,
-            statuses,
+            stream_id,
+            stream_status,
+            health_status,
         )
 
     return is_healthy

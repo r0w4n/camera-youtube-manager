@@ -43,6 +43,9 @@ def schedule_broadcast(youtube, camera: CameraConfig):
             "selfDeclaredMadeForKids": False,
         },
         "contentDetails": {
+            "monitorStream": {
+                "enableMonitorStream": False,
+            },
             "enableEmbed": True,
             "enableDvr": True,
             "recordFromStart": True,
@@ -67,8 +70,24 @@ def schedule_broadcast(youtube, camera: CameraConfig):
 
 
 def get_default_stream_id(youtube):
-    streams = youtube.liveStreams().list(part="id", mine=True).execute()
+    streams = youtube.liveStreams().list(part="id,cdn", mine=True).execute()
     return streams["items"][0]["id"]
+
+
+def get_stream_id_for_key(youtube, stream_key):
+    normalized_stream_key = stream_key.strip()
+    streams = youtube.liveStreams().list(part="id,cdn", mine=True).execute()
+
+    for stream in streams["items"]:
+        candidate_key = (
+            stream.get("cdn", {}).get("ingestionInfo", {}).get("streamName", "").strip()
+        )
+        if candidate_key == normalized_stream_key:
+            return stream["id"]
+
+    raise ValueError(
+        "Configured YouTube stream key does not match any reusable live stream"
+    )
 
 
 def parse_youtube_datetime(datetime_text):
@@ -151,8 +170,45 @@ def do_schedule(youtube, camera: CameraConfig):
     youtube.liveBroadcasts().bind(
         part="id,contentDetails",
         id=broadcast_id,
-        streamId=get_default_stream_id(youtube),
+        streamId=get_stream_id_for_key(youtube, camera.key),
     ).execute()
+
+
+def ensure_active_broadcast_bound_to_stream(youtube, camera: CameraConfig):
+    broadcast = get_active_broadcast(youtube, part="id,status,contentDetails")
+    if broadcast is None:
+        return None
+
+    expected_stream_id = get_stream_id_for_key(youtube, camera.key)
+    current_stream_id = broadcast.get("contentDetails", {}).get("boundStreamId")
+    if current_stream_id == expected_stream_id:
+        return expected_stream_id
+
+    life_cycle_status = broadcast.get("status", {}).get("lifeCycleStatus")
+    if life_cycle_status not in {"created", "ready"}:
+        logger.warning(
+            "%s - broadcast %s is bound to stream %s but configured key maps to %s; cannot rebind automatically while status is %s",
+            camera.name,
+            broadcast["id"],
+            current_stream_id,
+            expected_stream_id,
+            life_cycle_status,
+        )
+        return current_stream_id
+
+    logger.warning(
+        "%s - rebinding broadcast %s from stream %s to configured stream %s",
+        camera.name,
+        broadcast["id"],
+        current_stream_id,
+        expected_stream_id,
+    )
+    youtube.liveBroadcasts().bind(
+        part="id,contentDetails",
+        id=broadcast["id"],
+        streamId=expected_stream_id,
+    ).execute()
+    return expected_stream_id
 
 
 def end_schedule(youtube, camera: CameraConfig):

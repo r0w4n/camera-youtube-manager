@@ -30,65 +30,128 @@ class FakeRequest:
 class FakeLiveStreams:
     def __init__(self, payload):
         self.payload = payload
+        self.list_kwargs = None
 
     def list(self, **kwargs):
+        self.list_kwargs = kwargs
         return FakeRequest(self.payload)
 
 
 class FakeYoutube:
     def __init__(self, payload):
-        self.payload = payload
+        self.streams = FakeLiveStreams(payload)
 
     def liveStreams(self):
-        return FakeLiveStreams(self.payload)
+        return self.streams
 
 
 def test_is_live_stream_healthy_returns_false_for_bad_status():
     """Verify that a bad YouTube health status is treated as unhealthy."""
     camera = make_camera()
     youtube = FakeYoutube(
-        {"items": [{"status": {"healthStatus": {"status": "bad"}}}]}
+        {
+            "items": [
+                {
+                    "id": "stream-123",
+                    "status": {
+                        "streamStatus": "active",
+                        "healthStatus": {"status": "bad"},
+                    },
+                }
+            ]
+        }
     )
 
-    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is False
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube, "stream-123") is False
 
 
 def test_is_live_stream_healthy_returns_true_for_good_status():
     """Verify that a good YouTube health status is treated as healthy."""
     camera = make_camera()
     youtube = FakeYoutube(
-        {"items": [{"status": {"healthStatus": {"status": "good"}}}]}
+        {
+            "items": [
+                {
+                    "id": "stream-123",
+                    "status": {
+                        "streamStatus": "active",
+                        "healthStatus": {"status": "good"},
+                    },
+                }
+            ]
+        }
     )
 
-    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is True
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube, "stream-123") is True
+    assert youtube.streams.list_kwargs == {"part": "id,status", "id": "stream-123"}
 
 
 def test_is_live_stream_healthy_returns_true_for_ok_status():
     """Verify that an ok YouTube health status is treated as healthy."""
     camera = make_camera()
     youtube = FakeYoutube(
-        {"items": [{"status": {"healthStatus": {"status": "ok"}}}]}
+        {
+            "items": [
+                {
+                    "id": "stream-123",
+                    "status": {
+                        "streamStatus": "active",
+                        "healthStatus": {"status": "ok"},
+                    },
+                }
+            ]
+        }
     )
 
-    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is True
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube, "stream-123") is True
 
 
 def test_is_live_stream_healthy_returns_false_for_no_data_status():
     """Verify that a noData health status is treated as unhealthy."""
     camera = make_camera()
     youtube = FakeYoutube(
-        {"items": [{"status": {"healthStatus": {"status": "noData"}}}]}
+        {
+            "items": [
+                {
+                    "id": "stream-123",
+                    "status": {
+                        "streamStatus": "active",
+                        "healthStatus": {"status": "noData"},
+                    },
+                }
+            ]
+        }
     )
 
-    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is False
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube, "stream-123") is False
 
 
 def test_is_live_stream_healthy_returns_false_when_status_is_missing():
     """Verify that missing health status data is treated as unhealthy."""
     camera = make_camera()
-    youtube = FakeYoutube({"items": [{"status": {}}]})
+    youtube = FakeYoutube({"items": [{"id": "stream-123", "status": {}}]})
 
-    assert youtube_streamer.is_live_stream_healthy(camera, youtube) is False
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube, "stream-123") is False
+
+
+def test_is_live_stream_healthy_returns_false_when_stream_is_not_active():
+    """Verify that a non-active stream status is treated as unhealthy."""
+    camera = make_camera()
+    youtube = FakeYoutube(
+        {
+            "items": [
+                {
+                    "id": "stream-123",
+                    "status": {
+                        "streamStatus": "inactive",
+                        "healthStatus": {"status": "good"},
+                    },
+                }
+            ]
+        }
+    )
+
+    assert youtube_streamer.is_live_stream_healthy(camera, youtube, "stream-123") is False
 
 
 def test_start_stream_passes_special_characters_without_shell_parsing(monkeypatch):
