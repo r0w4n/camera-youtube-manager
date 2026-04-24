@@ -102,6 +102,16 @@ Before the service can run successfully, you also need:
 
 Place `client_secret.json` in the project root.
 
+## Camera and Broadcast Model
+
+The project intentionally treats each configured camera as having a one-to-one
+relationship with a YouTube account/channel and its scheduled broadcast.
+
+The main reason is URL persistence. A single scheduled broadcast gives viewers a
+stable YouTube URL for that camera. If a YouTube account has more than one live
+broadcast in rotation, the public URL changes between broadcasts, which makes it
+harder to publish an embeded camera link on a website.
+
 ## Project Files You Need
 
 At runtime, these files/directories matter:
